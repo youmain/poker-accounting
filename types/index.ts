@@ -194,6 +194,7 @@ export interface FirebaseSyncResult extends BaseSyncResult {
   connectedDevices: number
   createNewSession: () => Promise<string | null>
   joinSession: (sessionId: string) => Promise<boolean>
+  leaveSession: () => Promise<void>
 }
 
 export interface WebSocketSyncResult extends BaseSyncResult {

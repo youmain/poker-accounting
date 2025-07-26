@@ -73,6 +73,7 @@ import { HistoryModal } from "@/components/HistoryModal"
 import { SetupGuideModal } from "@/components/SetupGuideModal"
 import { StableSyncModal } from "@/components/StableSyncModal"
 import { FirebaseTestModal } from "@/components/FirebaseTestModal"
+import { FirebaseSyncModal } from "@/components/FirebaseSyncModal"
 import { formatCurrency } from "@/utils/receiptCalculations"
 
 export default function PokerManagementSystem() {
@@ -95,6 +96,7 @@ export default function PokerManagementSystem() {
   const [showEndOfDayModal, setShowEndOfDayModal] = useState(false)
   const [showStableSyncModal, setShowStableSyncModal] = useState(false)
   const [showFirebaseTestModal, setShowFirebaseTestModal] = useState(false)
+  const [showFirebaseSyncModal, setShowFirebaseSyncModal] = useState(false)
   const [selectedDailySales, setSelectedDailySales] = useState<DailySales | null>(null)
   const [playerSearchQuery, setPlayerSearchQuery] = useState("")
   const [historySearchQuery, setHistorySearchQuery] = useState("")
@@ -1933,6 +1935,18 @@ export default function PokerManagementSystem() {
               variant="outline"
               size="sm"
               onClick={() => {
+                setShowFirebaseSyncModal(true)
+                setShowMobileMenu(false)
+              }}
+              className="w-full justify-start h-10"
+            >
+              <Globe className="h-4 w-4 mr-2" />
+              インターネット同期
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
                 setShowOwnerModeModal(true)
                 setShowMobileMenu(false)
               }}
@@ -2563,6 +2577,11 @@ export default function PokerManagementSystem() {
       <FirebaseTestModal
         isOpen={showFirebaseTestModal}
         onCloseAction={() => setShowFirebaseTestModal(false)}
+      />
+
+      <FirebaseSyncModal
+        isOpen={showFirebaseSyncModal}
+        onCloseAction={() => setShowFirebaseSyncModal(false)}
       />
     </div>
   )

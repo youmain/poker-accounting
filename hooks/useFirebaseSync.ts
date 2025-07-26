@@ -148,6 +148,20 @@ export function useFirebaseSync(): FirebaseSyncResult {
     }
   }, [isConnected])
 
+  // セッションから退出
+  const leaveSession = useCallback(async () => {
+    try {
+      setIsConnected(false)
+      setSessionId("")
+      setConnectedDevices(0)
+      // ローカルデータで初期化
+      const localData = initializeFromLocalStorage()
+      setServerData(localData)
+    } catch (error) {
+      console.error("セッション退出エラー:", error)
+    }
+  }, [initializeFromLocalStorage])
+
   // 接続状態を更新
   const updateConnectedDevices = useCallback((count: number) => {
     setConnectedDevices(count)
@@ -180,6 +194,7 @@ export function useFirebaseSync(): FirebaseSyncResult {
     saveToServer,
     createNewSession,
     joinSession,
+    leaveSession,
     refreshData,
   }
 }
