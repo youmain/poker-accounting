@@ -112,6 +112,28 @@ export default function PokerManagementSystem() {
   const [lastSyncCheck, setLastSyncCheck] = useState<Date>(new Date())
   const [isLoading, setIsLoading] = useState(false)
 
+  // URLパラメータの自動処理
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const urlParams = new URLSearchParams(window.location.search)
+      const roomParam = urlParams.get("room")
+      const nameParam = urlParams.get("name")
+
+      if (roomParam && nameParam) {
+        console.log("URL parameters detected:", { room: roomParam, name: nameParam })
+        
+        // 自動的にStableSyncModalを開く
+        setShowStableSyncModal(true)
+        
+        // 少し遅延してからURLパラメータをクリア（StableSyncModalが処理するため）
+        setTimeout(() => {
+          const newUrl = window.location.pathname
+          window.history.replaceState({}, "", newUrl)
+        }, 2000)
+      }
+    }
+  }, [])
+
   // File input ref for CSV import
   const fileInputRef = useRef<HTMLInputElement>(null)
   const dataImportInputRef = useRef<HTMLInputElement>(null)
