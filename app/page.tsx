@@ -1940,7 +1940,7 @@ export default function PokerManagementSystem() {
               }}
               className="w-full justify-start h-10"
             >
-              <Globe className="h-4 w-4 mr-2" />
+              <Database className="h-4 w-4 mr-2" />
               インターネット同期
             </Button>
             <Button
@@ -2033,6 +2033,14 @@ export default function PokerManagementSystem() {
           >
             <Calculator className="h-4 w-4" />
             <span className="text-sm sm:text-base">レーキ確定</span>
+          </Button>
+          <Button
+            onClick={() => setShowFirebaseSyncModal(true)}
+            variant="outline"
+            className="flex items-center justify-center gap-2 h-10 sm:h-9"
+          >
+            <Database className="h-4 w-4" />
+            <span className="text-sm sm:text-base">インターネット同期</span>
           </Button>
           {isOwnerMode && (
             <>
