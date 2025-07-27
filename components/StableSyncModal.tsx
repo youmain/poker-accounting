@@ -94,6 +94,20 @@ export function StableSyncModal({
       sessionId,
       roomId
     })
+    
+    // QRコード表示条件のデバッグ
+    const qrCondition1 = isHost
+    const qrCondition2 = syncMode === "internet" && firebaseConnected && sessionId
+    const shouldShowQR = qrCondition1 || qrCondition2
+    
+    console.log("QR Code display conditions:", {
+      qrCondition1,
+      qrCondition2,
+      shouldShowQR,
+      syncMode,
+      firebaseConnected,
+      sessionId
+    })
   }, [syncMode, isConnected, isHost, stableConnected, stableIsHost, firebaseConnected, firebaseIsHost, sessionId, roomId])
 
   // URLパラメータから招待情報を取得して自動接続
@@ -229,7 +243,10 @@ export function StableSyncModal({
     
     if (syncMode === "internet") {
       // Firebaseセッション作成
+      console.log("Creating Firebase session...")
       const newSessionId = await createNewSession()
+      console.log("Firebase session creation result:", { newSessionId })
+      
       if (newSessionId) {
         console.log("Firebase session created successfully")
         toast({
@@ -237,6 +254,7 @@ export function StableSyncModal({
           description: `${hostName}としてセッションID: ${newSessionId} を作成しました。`,
         })
       } else {
+        console.log("Firebase session creation failed")
         toast({
           title: "インターネットセッション開始失敗",
           description: "Firebaseセッションの作成に失敗しました。",
@@ -364,6 +382,8 @@ export function StableSyncModal({
   }
 
   const generateInviteUrl = () => {
+    console.log("generateInviteUrl called with:", { syncMode, sessionId, roomId, inviteeName })
+    
     if (typeof window !== "undefined") {
       // 同期方式に応じてURLを生成
       if (syncMode === "internet") {
@@ -375,6 +395,8 @@ export function StableSyncModal({
           
           console.log("Generated internet invitation URL:", internetUrl)
           return internetUrl
+        } else {
+          console.log("No sessionId available for internet sync")
         }
       } else {
         // ローカル同期用URL（StableSync）
