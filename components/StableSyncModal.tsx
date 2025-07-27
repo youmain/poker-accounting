@@ -309,18 +309,19 @@ export function StableSyncModal({
   }
 
   const handleCopyRoomId = async () => {
-    if (roomId) {
+    const idToCopy = syncMode === "internet" ? sessionId : roomId
+    if (idToCopy) {
       try {
         if (typeof window !== "undefined" && navigator.clipboard) {
-          await navigator.clipboard.writeText(roomId)
+          await navigator.clipboard.writeText(idToCopy)
           toast({
             title: "コピー完了",
-            description: "ルームIDをクリップボードにコピーしました。",
+            description: `${syncMode === "internet" ? "セッションID" : "ルームID"}をクリップボードにコピーしました。`,
           })
         } else {
           // フォールバック: テキストエリアを使用
           const textArea = document.createElement('textarea')
-          textArea.value = roomId
+          textArea.value = idToCopy
           textArea.style.position = 'fixed'
           textArea.style.left = '-999999px'
           textArea.style.top = '-999999px'
@@ -331,7 +332,7 @@ export function StableSyncModal({
           document.body.removeChild(textArea)
           toast({
             title: "コピー完了",
-            description: "ルームIDをクリップボードにコピーしました。",
+            description: `${syncMode === "internet" ? "セッションID" : "ルームID"}をクリップボードにコピーしました。`,
           })
         }
       } catch (error) {
@@ -346,30 +347,34 @@ export function StableSyncModal({
   }
 
   const generateInviteUrl = () => {
-    if (roomId && typeof window !== "undefined") {
+    if (typeof window !== "undefined") {
       // 同期方式に応じてURLを生成
       if (syncMode === "internet") {
         // インターネット同期用URL（Firebaseセッション）
-        const internetUrl = process.env.NEXT_PUBLIC_PRODUCTION_URL 
-          ? `${process.env.NEXT_PUBLIC_PRODUCTION_URL}?session=${roomId}&name=${encodeURIComponent(inviteeName || "参加者")}`
-          : `${window.location.origin}?session=${roomId}&name=${encodeURIComponent(inviteeName || "参加者")}`
-        
-        console.log("Generated internet invitation URL:", internetUrl)
-        return internetUrl
+        if (sessionId) {
+          const internetUrl = process.env.NEXT_PUBLIC_PRODUCTION_URL 
+            ? `${process.env.NEXT_PUBLIC_PRODUCTION_URL}?session=${sessionId}&name=${encodeURIComponent(inviteeName || "参加者")}`
+            : `${window.location.origin}?session=${sessionId}&name=${encodeURIComponent(inviteeName || "参加者")}`
+          
+          console.log("Generated internet invitation URL:", internetUrl)
+          return internetUrl
+        }
       } else {
         // ローカル同期用URL（StableSync）
-        const localUrl = `${window.location.origin}?room=${roomId}&name=${encodeURIComponent(inviteeName || "参加者")}`
-        
-        // インターネット用URL（Vercel）も生成（フォールバック用）
-        const internetUrl = process.env.NEXT_PUBLIC_PRODUCTION_URL 
-          ? `${process.env.NEXT_PUBLIC_PRODUCTION_URL}?room=${roomId}&name=${encodeURIComponent(inviteeName || "参加者")}`
-          : localUrl
-        
-        // 自動フォールバック用のURL（ローカルを優先）
-        const fallbackUrl = localUrl
-        
-        console.log("Generated invitation URLs:", { localUrl, internetUrl, fallbackUrl })
-        return fallbackUrl
+        if (roomId) {
+          const localUrl = `${window.location.origin}?room=${roomId}&name=${encodeURIComponent(inviteeName || "参加者")}`
+          
+          // インターネット用URL（Vercel）も生成（フォールバック用）
+          const internetUrl = process.env.NEXT_PUBLIC_PRODUCTION_URL 
+            ? `${process.env.NEXT_PUBLIC_PRODUCTION_URL}?room=${roomId}&name=${encodeURIComponent(inviteeName || "参加者")}`
+            : localUrl
+          
+          // 自動フォールバック用のURL（ローカルを優先）
+          const fallbackUrl = localUrl
+          
+          console.log("Generated invitation URLs:", { localUrl, internetUrl, fallbackUrl })
+          return fallbackUrl
+        }
       }
     }
     return ""
@@ -532,13 +537,15 @@ export function StableSyncModal({
                   </Badge>
                 </div>
 
-                {isConnected && roomId && (
+                {isConnected && (roomId || sessionId) && (
                   <>
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">ルームID:</span>
+                      <span className="text-sm text-gray-600">
+                        {syncMode === "internet" ? "セッションID:" : "ルームID:"}
+                      </span>
                       <div className="flex items-center gap-2">
                         <Badge variant="outline" className="font-mono">
-                          {roomId}
+                          {syncMode === "internet" ? sessionId : roomId}
                         </Badge>
                         <Button size="sm" variant="ghost" onClick={handleCopyRoomId} className="h-6 w-6 p-0">
                           <Copy className="h-3 w-3" />
@@ -809,7 +816,12 @@ export function StableSyncModal({
             {isConnected && (
               <Alert>
                 <CheckCircle className="h-4 w-4" />
-                <AlertDescription>ルーム {roomId} に接続中です。「状況」タブで詳細を確認できます。</AlertDescription>
+                <AlertDescription>
+                  {syncMode === "internet" 
+                    ? `Firebaseセッション ${sessionId} に接続中です。「状況」タブで詳細を確認できます。`
+                    : `ルーム ${roomId} に接続中です。「状況」タブで詳細を確認できます。`
+                  }
+                </AlertDescription>
               </Alert>
             )}
 
