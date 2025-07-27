@@ -14,7 +14,10 @@ import {
   updateDoc, 
   deleteDoc,
   serverTimestamp,
-  Timestamp 
+  Timestamp,
+  onSnapshot,
+  QuerySnapshot,
+  DocumentData
 } from 'firebase/firestore'
 import type { ServerData, Player, GameSession, Receipt, DailySales, HistoryEntry, SystemSettings } from '@/types'
 
@@ -53,6 +56,16 @@ export interface QRCodeInfo {
   businessDate: string
   expiresAt: Timestamp
   isActive: boolean
+}
+
+// 接続者情報の型定義
+export interface ConnectedUser {
+  uid: string
+  name: string
+  isHost: boolean
+  joinedAt: Timestamp
+  deviceId: string
+  sessionId: string
 }
 
 // Firebase認証・データ管理クラス
@@ -178,6 +191,54 @@ export class FirebaseManager {
   // 現在のユーザーを取得
   getCurrentUser(): User | null {
     return auth.currentUser
+  }
+
+  // 接続者を追加
+  async addConnectedUser(userData: Omit<ConnectedUser, 'uid' | 'joinedAt'>): Promise<void> {
+    if (!auth.currentUser) throw new Error('ユーザーが認証されていません')
+    
+    const connectedUser: ConnectedUser = {
+      uid: auth.currentUser.uid,
+      ...userData,
+      joinedAt: serverTimestamp() as Timestamp
+    }
+
+    await setDoc(doc(db, 'connectedUsers', auth.currentUser.uid), connectedUser)
+  }
+
+  // 接続者を削除
+  async removeConnectedUser(): Promise<void> {
+    if (!auth.currentUser) return
+    
+    await deleteDoc(doc(db, 'connectedUsers', auth.currentUser.uid))
+  }
+
+  // セッションの接続者一覧を取得
+  async getConnectedUsers(sessionId: string): Promise<ConnectedUser[]> {
+    try {
+      const q = query(
+        collection(db, 'connectedUsers'),
+        where('sessionId', '==', sessionId)
+      )
+      const querySnapshot = await getDocs(q)
+      return querySnapshot.docs.map(doc => doc.data() as ConnectedUser)
+    } catch (error) {
+      console.error('接続者一覧取得エラー:', error)
+      return []
+    }
+  }
+
+  // 接続者一覧のリアルタイム監視
+  onConnectedUsersChange(sessionId: string, callback: (users: ConnectedUser[]) => void): () => void {
+    const q = query(
+      collection(db, 'connectedUsers'),
+      where('sessionId', '==', sessionId)
+    )
+    
+    return onSnapshot(q, (snapshot: QuerySnapshot<DocumentData>) => {
+      const users = snapshot.docs.map(doc => doc.data() as ConnectedUser)
+      callback(users)
+    })
   }
 
   // ログアウト

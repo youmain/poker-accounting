@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react"
 import { firebaseManager } from "@/lib/firebase"
 import { localStorageUtils } from "@/lib/utils"
 import type { FirebaseSyncResult, ServerData } from "@/types"
+import type { ConnectedUser } from "@/lib/firebase"
 
 export function useFirebaseSync(): FirebaseSyncResult {
   const [isConnected, setIsConnected] = useState(false)
@@ -12,6 +13,7 @@ export function useFirebaseSync(): FirebaseSyncResult {
   const [sessionId, setSessionId] = useState<string>("")
   const [connectedDevices, setConnectedDevices] = useState<number>(0)
   const [isHost, setIsHost] = useState(false)
+  const [connectedUsers, setConnectedUsers] = useState<ConnectedUser[]>([])
 
   // ローカルストレージからデータを初期化（共通ユーティリティ使用）
   const initializeFromLocalStorage = useCallback(() => {
@@ -54,7 +56,7 @@ export function useFirebaseSync(): FirebaseSyncResult {
   )
 
   // 新しいセッションを作成（ホスト）
-  const createNewSession = useCallback(async () => {
+  const createNewSession = useCallback(async (hostName?: string) => {
     console.log("=== createNewSession START ===")
     setIsLoading(true)
     try {
@@ -88,6 +90,10 @@ export function useFirebaseSync(): FirebaseSyncResult {
 
       setIsConnected(true)
       setConnectedDevices(2) // ホスト1台 + 参加者1台 = 2台
+      
+      // 接続者として追加
+      await addConnectedUser(hostName || "オーナー", true)
+      
       console.log("=== createNewSession COMPLETED ===")
       console.log("Final state - sessionId:", newSessionId, "isHost: true, isConnected: true, connectedDevices: 2")
       return newSessionId
@@ -186,6 +192,33 @@ export function useFirebaseSync(): FirebaseSyncResult {
     }
   }, [initializeFromLocalStorage])
 
+  // 接続者を追加
+  const addConnectedUser = useCallback(async (name: string, isHost: boolean) => {
+    if (!sessionId) return
+    
+    try {
+      await firebaseManager.addConnectedUser({
+        name,
+        isHost,
+        deviceId: `device-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+        sessionId
+      })
+      console.log("Connected user added:", { name, isHost, sessionId })
+    } catch (error) {
+      console.error("接続者追加エラー:", error)
+    }
+  }, [sessionId])
+
+  // 接続者を削除
+  const removeConnectedUser = useCallback(async () => {
+    try {
+      await firebaseManager.removeConnectedUser()
+      console.log("Connected user removed")
+    } catch (error) {
+      console.error("接続者削除エラー:", error)
+    }
+  }, [])
+
   // 接続状態を更新
   const updateConnectedDevices = useCallback((count: number) => {
     setConnectedDevices(count)
@@ -220,31 +253,15 @@ export function useFirebaseSync(): FirebaseSyncResult {
 
     console.log("Setting up Firebase real-time listeners for session:", sessionId, "isHost:", isHost)
     
-    // 接続デバイス数の監視
-    const updateConnectedDevicesCount = async () => {
-      try {
-        // 実際の接続数を取得（簡易版）
-        // ホストと参加者の両方で2台と表示（実際の接続数）
-        const connectedCount = 2 // ホスト1台 + 参加者1台 = 2台
-        setConnectedDevices(connectedCount)
-        console.log("Updated connected devices count:", connectedCount, "(isHost:", isHost, ")")
-      } catch (error) {
-        console.error("接続デバイス数更新エラー:", error)
-      }
-    }
-
-    // 初期接続数設定
-    console.log("Initial connected devices count update")
-    updateConnectedDevicesCount()
-
-    // 定期的に接続数を更新（簡易版）
-    const interval = setInterval(() => {
-      console.log("Periodic connected devices count update")
-      updateConnectedDevicesCount()
-    }, 5000)
+    // 接続者のリアルタイム監視
+    const unsubscribe = firebaseManager.onConnectedUsersChange(sessionId, (users) => {
+      console.log("Connected users updated:", users)
+      setConnectedUsers(users)
+      setConnectedDevices(users.length)
+    })
 
     return () => {
-      clearInterval(interval)
+      unsubscribe()
       console.log("Cleaned up Firebase real-time listeners")
     }
   }, [sessionId, isConnected, isHost])
@@ -266,6 +283,7 @@ export function useFirebaseSync(): FirebaseSyncResult {
     sessionId,
     connectedDevices,
     isHost,
+    connectedUsers,
     saveToServer,
     createNewSession,
     joinSession,
