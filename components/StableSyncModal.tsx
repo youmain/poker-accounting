@@ -108,6 +108,16 @@ export function StableSyncModal({
       firebaseConnected,
       sessionId
     })
+    
+    // 詳細な条件チェック
+    console.log("Detailed QR conditions:", {
+      "syncMode === 'internet'": syncMode === "internet",
+      "firebaseConnected": firebaseConnected,
+      "sessionId exists": !!sessionId,
+      "sessionId value": sessionId,
+      "isHost": isHost,
+      "firebaseIsHost": firebaseIsHost
+    })
   }, [syncMode, isConnected, isHost, stableConnected, stableIsHost, firebaseConnected, firebaseIsHost, sessionId, roomId])
 
   // URLパラメータから招待情報を取得して自動接続
@@ -249,6 +259,13 @@ export function StableSyncModal({
       
       if (newSessionId) {
         console.log("Firebase session created successfully")
+        console.log("Session creation completed - checking state after creation")
+        console.log("Current state after session creation:", {
+          firebaseConnected,
+          firebaseIsHost,
+          sessionId,
+          isHost
+        })
         toast({
           title: "インターネットセッション開始成功",
           description: `${hostName}としてセッションID: ${newSessionId} を作成しました。`,
@@ -652,7 +669,19 @@ export function StableSyncModal({
                       </div>
                     )}
 
-                    {(isHost || (syncMode === "internet" && firebaseConnected && sessionId)) && (
+                    {(() => {
+                      const shouldShowQR = isHost || (syncMode === "internet" && firebaseConnected && sessionId)
+                      console.log("QR Code render condition check:", {
+                        shouldShowQR,
+                        isHost,
+                        syncMode,
+                        firebaseConnected,
+                        sessionId,
+                        condition1: isHost,
+                        condition2: syncMode === "internet" && firebaseConnected && sessionId
+                      })
+                      return shouldShowQR
+                    })() && (
                       <div className="pt-2 border-t">
                         <div className="space-y-3">
                           <div>
