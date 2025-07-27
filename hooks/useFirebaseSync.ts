@@ -89,13 +89,14 @@ export function useFirebaseSync(): FirebaseSyncResult {
       }
 
       setIsConnected(true)
-      setConnectedDevices(2) // ホスト1台 + 参加者1台 = 2台
+      setConnectedDevices(1) // 初期は1台（自分だけ）
       
       // 接続者として追加
+      console.log("Adding host as connected user...")
       await addConnectedUser(hostName || "オーナー", true)
       
       console.log("=== createNewSession COMPLETED ===")
-      console.log("Final state - sessionId:", newSessionId, "isHost: true, isConnected: true, connectedDevices: 2")
+      console.log("Final state - sessionId:", newSessionId, "isHost: true, isConnected: true")
       return newSessionId
     } catch (error) {
       console.error("セッション作成エラー:", error)
@@ -135,10 +136,14 @@ export function useFirebaseSync(): FirebaseSyncResult {
 
       setServerData(firebaseData)
       setIsConnected(true)
-      // 参加者の場合も2台と表示（ホスト1台 + 参加者1台）
-      setConnectedDevices(2)
+      setConnectedDevices(1) // 初期は1台（自分だけ）
+      
+      // 接続者として追加
+      console.log("Adding participant as connected user...")
+      await addConnectedUser("参加者", false)
+      
       console.log("=== joinSession COMPLETED ===")
-      console.log("Final state - sessionId:", sessionId, "isHost: false, isConnected: true, connectedDevices: 2")
+      console.log("Final state - sessionId:", sessionId, "isHost: false, isConnected: true")
       return true
     } catch (error) {
       console.error("セッション参加エラー:", error)
@@ -194,16 +199,27 @@ export function useFirebaseSync(): FirebaseSyncResult {
 
   // 接続者を追加
   const addConnectedUser = useCallback(async (name: string, isHost: boolean) => {
-    if (!sessionId) return
+    console.log("=== addConnectedUser called ===")
+    console.log("sessionId:", sessionId)
+    console.log("name:", name)
+    console.log("isHost:", isHost)
+    
+    if (!sessionId) {
+      console.log("No sessionId available, skipping addConnectedUser")
+      return
+    }
     
     try {
-      await firebaseManager.addConnectedUser({
+      const userData = {
         name,
         isHost,
         deviceId: `device-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
         sessionId
-      })
-      console.log("Connected user added:", { name, isHost, sessionId })
+      }
+      console.log("Adding connected user with data:", userData)
+      
+      await firebaseManager.addConnectedUser(userData)
+      console.log("Connected user added successfully:", { name, isHost, sessionId })
     } catch (error) {
       console.error("接続者追加エラー:", error)
     }
@@ -254,10 +270,14 @@ export function useFirebaseSync(): FirebaseSyncResult {
     console.log("Setting up Firebase real-time listeners for session:", sessionId, "isHost:", isHost)
     
     // 接続者のリアルタイム監視
+    console.log("Setting up real-time listener for session:", sessionId)
     const unsubscribe = firebaseManager.onConnectedUsersChange(sessionId, (users) => {
-      console.log("Connected users updated:", users)
+      console.log("=== Connected users updated ===")
+      console.log("Users count:", users.length)
+      console.log("Users:", users)
       setConnectedUsers(users)
       setConnectedDevices(users.length)
+      console.log("Updated connectedDevices to:", users.length)
     })
 
     return () => {

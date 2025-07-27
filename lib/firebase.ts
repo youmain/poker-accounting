@@ -195,6 +195,10 @@ export class FirebaseManager {
 
   // 接続者を追加
   async addConnectedUser(userData: Omit<ConnectedUser, 'uid' | 'joinedAt'>): Promise<void> {
+    console.log("=== Firebase addConnectedUser ===")
+    console.log("auth.currentUser:", auth.currentUser)
+    console.log("userData:", userData)
+    
     if (!auth.currentUser) throw new Error('ユーザーが認証されていません')
     
     const connectedUser: ConnectedUser = {
@@ -202,8 +206,12 @@ export class FirebaseManager {
       ...userData,
       joinedAt: serverTimestamp() as Timestamp
     }
+    
+    console.log("Connected user object:", connectedUser)
+    console.log("Saving to Firebase...")
 
     await setDoc(doc(db, 'connectedUsers', auth.currentUser.uid), connectedUser)
+    console.log("Connected user saved to Firebase successfully")
   }
 
   // 接続者を削除
