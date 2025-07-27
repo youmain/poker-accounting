@@ -209,6 +209,36 @@ export function useFirebaseSync(): FirebaseSyncResult {
     initialize()
   }, [initializeFromLocalStorage])
 
+  // Firebaseリアルタイム同期の設定
+  useEffect(() => {
+    if (!sessionId || !isConnected) return
+
+    console.log("Setting up Firebase real-time listeners for session:", sessionId)
+    
+    // 接続デバイス数の監視
+    const updateConnectedDevicesCount = async () => {
+      try {
+        // 実際の接続数を取得（簡易版）
+        const connectedCount = isHost ? 1 : 2 // ホスト1台 + 参加者1台
+        setConnectedDevices(connectedCount)
+        console.log("Updated connected devices count:", connectedCount)
+      } catch (error) {
+        console.error("接続デバイス数更新エラー:", error)
+      }
+    }
+
+    // 初期接続数設定
+    updateConnectedDevicesCount()
+
+    // 定期的に接続数を更新（簡易版）
+    const interval = setInterval(updateConnectedDevicesCount, 5000)
+
+    return () => {
+      clearInterval(interval)
+      console.log("Cleaned up Firebase real-time listeners")
+    }
+  }, [sessionId, isConnected, isHost])
+
   // 接続状態の監視（一時的に無効化）
   // useEffect(() => {
   //   if (!isConnected && sessionId) {

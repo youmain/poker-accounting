@@ -508,7 +508,7 @@ export function StableSyncModal({
   const getStatusIcon = () => {
     if (isLoading) {
       return <RefreshCw className="h-4 w-4 text-yellow-600 animate-spin" />
-    } else if (isConnected) {
+    } else if (isConnected || firebaseConnected) {
       return <CheckCircle className="h-4 w-4 text-green-600" />
     } else {
       return <AlertCircle className="h-4 w-4 text-red-600" />
@@ -518,7 +518,7 @@ export function StableSyncModal({
   const getStatusText = () => {
     if (isLoading) {
       return "接続中..."
-    } else if (isConnected) {
+    } else if (isConnected || firebaseConnected) {
       return "接続中"
     } else {
       return "未接続"
@@ -528,7 +528,7 @@ export function StableSyncModal({
   const getStatusColor = () => {
     if (isLoading) {
       return "text-yellow-600"
-    } else if (isConnected) {
+    } else if (isConnected || firebaseConnected) {
       return "text-green-600"
     } else {
       return "text-red-600"
