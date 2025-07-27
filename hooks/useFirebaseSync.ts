@@ -93,7 +93,9 @@ export function useFirebaseSync(): FirebaseSyncResult {
       
       // 接続者として追加
       console.log("Adding host as connected user...")
-      await addConnectedUser(hostName || "オーナー", true, newSessionId)
+      const finalHostName = hostName || "オーナー"
+      console.log("Host name:", finalHostName)
+      await addConnectedUser(finalHostName, true, newSessionId)
       
       console.log("=== createNewSession COMPLETED ===")
       console.log("Final state - sessionId:", newSessionId, "isHost: true, isConnected: true")
@@ -140,7 +142,11 @@ export function useFirebaseSync(): FirebaseSyncResult {
       
       // 接続者として追加
       console.log("Adding participant as connected user...")
-      await addConnectedUser("参加者", false, sessionId)
+      // URLパラメータから名前を取得
+      const urlParams = new URLSearchParams(window.location.search)
+      const participantName = urlParams.get('name') || "参加者"
+      console.log("Participant name from URL:", participantName)
+      await addConnectedUser(participantName, false, sessionId)
       
       console.log("=== joinSession COMPLETED ===")
       console.log("Final state - sessionId:", sessionId, "isHost: false, isConnected: true")

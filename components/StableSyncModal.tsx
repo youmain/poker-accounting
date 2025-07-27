@@ -402,6 +402,8 @@ export function StableSyncModal({
     console.log("sessionId:", sessionId)
     console.log("roomId:", roomId)
     console.log("inviteeName:", inviteeName)
+    console.log("inviteeName.trim():", inviteeName.trim())
+    console.log("inviteeName.length:", inviteeName.length)
     console.log("NEXT_PUBLIC_PRODUCTION_URL:", process.env.NEXT_PUBLIC_PRODUCTION_URL)
     console.log("window.location.origin:", typeof window !== "undefined" ? window.location.origin : "undefined")
     
