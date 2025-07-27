@@ -11,6 +11,7 @@ export function useFirebaseSync(): FirebaseSyncResult {
   const [serverData, setServerData] = useState<ServerData | null>(null)
   const [sessionId, setSessionId] = useState<string>("")
   const [connectedDevices, setConnectedDevices] = useState<number>(0)
+  const [isHost, setIsHost] = useState(false)
 
   // ローカルストレージからデータを初期化（共通ユーティリティ使用）
   const initializeFromLocalStorage = useCallback(() => {
@@ -62,6 +63,7 @@ export function useFirebaseSync(): FirebaseSyncResult {
       // 新しいセッションIDを生成
       const newSessionId = `session-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
       setSessionId(newSessionId)
+      setIsHost(true) // ホストとして設定
 
       // ローカルデータを初期化してFirebaseに保存
       const initialData = initializeFromLocalStorage()
@@ -78,6 +80,7 @@ export function useFirebaseSync(): FirebaseSyncResult {
       }
 
       setIsConnected(true)
+      setConnectedDevices(1) // ホスト1台
       return newSessionId
     } catch (error) {
       console.error("セッション作成エラー:", error)
@@ -96,6 +99,7 @@ export function useFirebaseSync(): FirebaseSyncResult {
       
       // セッションIDを設定
       setSessionId(sessionId)
+      setIsHost(false) // 参加者として設定
 
       // Firebaseからデータを取得
       const players = await firebaseManager.getData("players")
@@ -116,6 +120,7 @@ export function useFirebaseSync(): FirebaseSyncResult {
 
       setServerData(firebaseData)
       setIsConnected(true)
+      setConnectedDevices(2) // ホスト + 参加者
       return true
     } catch (error) {
       console.error("セッション参加エラー:", error)
@@ -197,6 +202,7 @@ export function useFirebaseSync(): FirebaseSyncResult {
     serverData,
     sessionId,
     connectedDevices,
+    isHost,
     saveToServer,
     createNewSession,
     joinSession,

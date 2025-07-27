@@ -192,6 +192,7 @@ export interface NetworkSyncResult extends BaseSyncResult {
 export interface FirebaseSyncResult extends BaseSyncResult {
   sessionId: string
   connectedDevices: number
+  isHost: boolean
   createNewSession: () => Promise<string | null>
   joinSession: (sessionId: string) => Promise<boolean>
   leaveSession: () => Promise<void>

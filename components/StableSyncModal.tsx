@@ -52,7 +52,7 @@ export function StableSyncModal({
     isConnected: stableConnected,
     isLoading: stableLoading,
     roomId,
-    isHost,
+    isHost: stableIsHost,
     startHost,
     joinRoom,
     leaveRoom,
@@ -68,6 +68,7 @@ export function StableSyncModal({
     isConnected: firebaseConnected,
     isLoading: firebaseLoading,
     sessionId,
+    isHost: firebaseIsHost,
     createNewSession,
     joinSession,
     leaveSession,
@@ -78,6 +79,7 @@ export function StableSyncModal({
   // 統合された状態
   const isConnected = stableConnected || firebaseConnected
   const isLoading = stableLoading || firebaseLoading
+  const isHost = syncMode === "internet" ? firebaseIsHost : stableIsHost
 
   // URLパラメータから招待情報を取得して自動接続
   useEffect(() => {
@@ -614,7 +616,7 @@ export function StableSyncModal({
                       </div>
                     )}
 
-                    {(isHost || (syncMode === "internet" && firebaseConnected)) && (
+                    {isHost && (
                       <div className="pt-2 border-t">
                         <div className="space-y-3">
                           <div>
