@@ -108,7 +108,7 @@ export function StableSyncModal({
           // 自動接続を実行
           const autoConnect = async () => {
             if (sessionParam) {
-              // Firebaseセッション接続
+              // Firebaseセッション接続（インターネット）
               console.log("Starting Firebase auto-connection to session:", sessionParam)
               setSyncMode("internet")
               const success = await joinSession(sessionParam)
@@ -130,27 +130,47 @@ export function StableSyncModal({
                 })
               }
             } else if (roomParam) {
-              // StableSync接続
-              console.log("Starting StableSync auto-connection to room:", roomParam.toUpperCase())
+              // 自動フォールバック接続（ローカル → インターネット）
+              console.log("Starting auto-fallback connection for room:", roomParam.toUpperCase())
               setSyncMode("local")
               setRoomIdInput(roomParam.toUpperCase())
-              const success = await joinRoom(roomParam.toUpperCase(), decodedName)
+              
+              // まずローカル同期を試行
+              console.log("Trying local connection first...")
+              setWelcomeMessage(`${decodedName}さん、ローカル接続を試行中...`)
+              const localSuccess = await joinRoom(roomParam.toUpperCase(), decodedName)
 
-              if (success) {
-                console.log("StableSync auto-connection successful")
+              if (localSuccess) {
+                console.log("Local connection successful")
                 setWelcomeMessage(`${decodedName}さん、ローカルネットワーク経由で接続完了！`)
                 toast({
                   title: "自動接続成功",
-                  description: `${decodedName}さんとしてルーム ${roomParam.toUpperCase()} に接続しました。`,
+                  description: `${decodedName}さんとしてローカルルーム ${roomParam.toUpperCase()} に接続しました。`,
                 })
               } else {
-                console.log("StableSync auto-connection failed")
-                setWelcomeMessage(`${decodedName}さん、ローカル接続に失敗しました。`)
-                toast({
-                  title: "自動接続失敗",
-                  description: "ルームが見つからないか、接続に失敗しました。",
-                  variant: "destructive",
-                })
+                console.log("Local connection failed, trying internet fallback...")
+                setWelcomeMessage(`${decodedName}さん、ローカル接続失敗。インターネット接続を試行中...`)
+                
+                // ローカル失敗時はインターネット同期を試行
+                setSyncMode("internet")
+                const internetSuccess = await joinSession(roomParam.toUpperCase())
+                
+                if (internetSuccess) {
+                  console.log("Internet fallback successful")
+                  setWelcomeMessage(`${decodedName}さん、インターネット経由で接続完了！`)
+                  toast({
+                    title: "自動接続成功",
+                    description: `${decodedName}さんとしてインターネット経由で接続しました。`,
+                  })
+                } else {
+                  console.log("Both local and internet connections failed")
+                  setWelcomeMessage(`${decodedName}さん、ローカル・インターネット両方の接続に失敗しました。`)
+                  toast({
+                    title: "自動接続失敗",
+                    description: "ローカルネットワークとインターネット両方の接続に失敗しました。手動で接続してください。",
+                    variant: "destructive",
+                  })
+                }
               }
             }
 
@@ -284,19 +304,19 @@ export function StableSyncModal({
 
   const generateInviteUrl = () => {
     if (roomId && typeof window !== "undefined") {
-      // 本番URLが設定されている場合はそれを使用、そうでなければローカルURLを使用
-      const baseUrl = process.env.NEXT_PUBLIC_PRODUCTION_URL || window.location.origin
+      // ローカルネットワーク用URL
+      const localUrl = `${window.location.origin}?room=${roomId}&name=${encodeURIComponent(inviteeName || "参加者")}`
       
-      const params = new URLSearchParams()
-      params.set("room", roomId)
-
-      if (inviteeName.trim()) {
-        params.set("name", inviteeName.trim())
-      }
-
-      const fullUrl = `${baseUrl}?${params.toString()}`
-      console.log("Generated invitation URL:", fullUrl)
-      return fullUrl
+      // インターネット用URL（Vercel）
+      const internetUrl = process.env.NEXT_PUBLIC_PRODUCTION_URL 
+        ? `${process.env.NEXT_PUBLIC_PRODUCTION_URL}?room=${roomId}&name=${encodeURIComponent(inviteeName || "参加者")}`
+        : localUrl
+      
+      // 自動フォールバック用のURL（ローカルを優先）
+      const fallbackUrl = localUrl
+      
+      console.log("Generated invitation URLs:", { localUrl, internetUrl, fallbackUrl })
+      return fallbackUrl
     }
     return ""
   }
@@ -552,15 +572,13 @@ export function StableSyncModal({
                             <p className="text-xs text-gray-500 text-center mt-2">
                               {inviteeName.trim() ? `${inviteeName}さん` : "他のデバイス"}がこのQRコードを読み取って参加
                             </p>
-                            {process.env.NEXT_PUBLIC_PRODUCTION_URL && (
-                              <p className="text-xs text-blue-600 text-center mt-1">
-                                🌐 インターネット経由でアクセス可能
-                              </p>
-                            )}
+                            <p className="text-xs text-blue-600 text-center mt-1">
+                              🔄 自動フォールバック対応（ローカル → インターネット）
+                            </p>
                             
                             {/* 招待URLの表示 */}
                             <div className="mt-3 space-y-2">
-                              <p className="text-xs text-gray-600 text-center">招待URL:</p>
+                              <p className="text-xs text-gray-600 text-center">招待URL（自動フォールバック）:</p>
                               <div className="flex items-center gap-2">
                                 <code className="flex-1 p-2 bg-gray-100 rounded text-xs font-mono break-all">
                                   {generateInviteUrl() || "URL生成中..."}
@@ -574,6 +592,9 @@ export function StableSyncModal({
                                   <Copy className="h-3 w-3" />
                                 </Button>
                               </div>
+                              <p className="text-xs text-gray-500 text-center">
+                                ローカル接続失敗時は自動的にインターネット接続を試行
+                              </p>
                             </div>
                           </div>
                         </div>
