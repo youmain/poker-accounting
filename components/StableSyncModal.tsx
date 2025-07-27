@@ -208,50 +208,93 @@ export function StableSyncModal({
   }, [isConnected, isOpen, urlChecked, joinRoom, joinSession, toast])
 
   const handleStartHost = async () => {
-    console.log("Starting host from modal as:", hostName)
-    const newRoomId = await startHost(hostName)
-    if (newRoomId) {
-      console.log("Host started successfully")
-      toast({
-        title: "ホスト開始成功",
-        description: `${hostName}としてルームID: ${newRoomId} を作成しました。`,
-      })
-    } else {
-      toast({
-        title: "ホスト開始失敗",
-        description: "ホストの開始に失敗しました。",
-        variant: "destructive",
-      })
-    }
-  }
-
-  const handleJoinRoom = async () => {
-    console.log("Joining room from modal:", roomIdInput)
-    if (roomIdInput.trim().length === 6) {
-      const participantName = inviteeName.trim() || "匿名ユーザー"
-      const success = await joinRoom(roomIdInput.trim().toUpperCase(), participantName)
-      if (success) {
-        setRoomIdInput("")
-        setInviteeName("")
-        setWelcomeMessage("")
-        console.log("Successfully joined room")
+    console.log("Starting host from modal as:", hostName, "with sync mode:", syncMode)
+    
+    if (syncMode === "internet") {
+      // Firebaseセッション作成
+      const newSessionId = await createNewSession()
+      if (newSessionId) {
+        console.log("Firebase session created successfully")
         toast({
-          title: "接続成功",
-          description: `${participantName}としてルーム ${roomIdInput.trim().toUpperCase()} に接続しました。`,
+          title: "インターネットセッション開始成功",
+          description: `${hostName}としてセッションID: ${newSessionId} を作成しました。`,
         })
       } else {
         toast({
-          title: "接続失敗",
-          description: "ルームが見つからないか、接続に失敗しました。",
+          title: "インターネットセッション開始失敗",
+          description: "Firebaseセッションの作成に失敗しました。",
           variant: "destructive",
         })
       }
     } else {
-      toast({
-        title: "入力エラー",
-        description: "6文字のルームIDを入力してください。",
-        variant: "destructive",
-      })
+      // StableSyncルーム作成
+      const newRoomId = await startHost(hostName)
+      if (newRoomId) {
+        console.log("StableSync host started successfully")
+        toast({
+          title: "ローカルホスト開始成功",
+          description: `${hostName}としてルームID: ${newRoomId} を作成しました。`,
+        })
+      } else {
+        toast({
+          title: "ローカルホスト開始失敗",
+          description: "ローカルホストの開始に失敗しました。",
+          variant: "destructive",
+        })
+      }
+    }
+  }
+
+  const handleJoinRoom = async () => {
+    console.log("Joining room/session from modal:", roomIdInput, "with sync mode:", syncMode)
+    
+    if (syncMode === "internet") {
+      // Firebaseセッション参加
+      const success = await joinSession(roomIdInput.trim())
+      if (success) {
+        setRoomIdInput("")
+        setInviteeName("")
+        setWelcomeMessage("")
+        console.log("Successfully joined Firebase session")
+        toast({
+          title: "接続成功",
+          description: `Firebaseセッション ${roomIdInput.trim()} に接続しました。`,
+        })
+      } else {
+        toast({
+          title: "接続失敗",
+          description: "Firebaseセッションが見つからないか、接続に失敗しました。",
+          variant: "destructive",
+        })
+      }
+    } else {
+      // StableSyncルーム参加
+      if (roomIdInput.trim().length === 6) {
+        const participantName = inviteeName.trim() || "匿名ユーザー"
+        const success = await joinRoom(roomIdInput.trim().toUpperCase(), participantName)
+        if (success) {
+          setRoomIdInput("")
+          setInviteeName("")
+          setWelcomeMessage("")
+          console.log("Successfully joined StableSync room")
+          toast({
+            title: "接続成功",
+            description: `${participantName}としてルーム ${roomIdInput.trim().toUpperCase()} に接続しました。`,
+          })
+        } else {
+          toast({
+            title: "接続失敗",
+            description: "ルームが見つからないか、接続に失敗しました。",
+            variant: "destructive",
+          })
+        }
+      } else {
+        toast({
+          title: "入力エラー",
+          description: "6文字のルームIDを入力してください。",
+          variant: "destructive",
+        })
+      }
     }
   }
 
@@ -304,19 +347,30 @@ export function StableSyncModal({
 
   const generateInviteUrl = () => {
     if (roomId && typeof window !== "undefined") {
-      // ローカルネットワーク用URL
-      const localUrl = `${window.location.origin}?room=${roomId}&name=${encodeURIComponent(inviteeName || "参加者")}`
-      
-      // インターネット用URL（Vercel）
-      const internetUrl = process.env.NEXT_PUBLIC_PRODUCTION_URL 
-        ? `${process.env.NEXT_PUBLIC_PRODUCTION_URL}?room=${roomId}&name=${encodeURIComponent(inviteeName || "参加者")}`
-        : localUrl
-      
-      // 自動フォールバック用のURL（ローカルを優先）
-      const fallbackUrl = localUrl
-      
-      console.log("Generated invitation URLs:", { localUrl, internetUrl, fallbackUrl })
-      return fallbackUrl
+      // 同期方式に応じてURLを生成
+      if (syncMode === "internet") {
+        // インターネット同期用URL（Firebaseセッション）
+        const internetUrl = process.env.NEXT_PUBLIC_PRODUCTION_URL 
+          ? `${process.env.NEXT_PUBLIC_PRODUCTION_URL}?session=${roomId}&name=${encodeURIComponent(inviteeName || "参加者")}`
+          : `${window.location.origin}?session=${roomId}&name=${encodeURIComponent(inviteeName || "参加者")}`
+        
+        console.log("Generated internet invitation URL:", internetUrl)
+        return internetUrl
+      } else {
+        // ローカル同期用URL（StableSync）
+        const localUrl = `${window.location.origin}?room=${roomId}&name=${encodeURIComponent(inviteeName || "参加者")}`
+        
+        // インターネット用URL（Vercel）も生成（フォールバック用）
+        const internetUrl = process.env.NEXT_PUBLIC_PRODUCTION_URL 
+          ? `${process.env.NEXT_PUBLIC_PRODUCTION_URL}?room=${roomId}&name=${encodeURIComponent(inviteeName || "参加者")}`
+          : localUrl
+        
+        // 自動フォールバック用のURL（ローカルを優先）
+        const fallbackUrl = localUrl
+        
+        console.log("Generated invitation URLs:", { localUrl, internetUrl, fallbackUrl })
+        return fallbackUrl
+      }
     }
     return ""
   }
@@ -573,12 +627,17 @@ export function StableSyncModal({
                               {inviteeName.trim() ? `${inviteeName}さん` : "他のデバイス"}がこのQRコードを読み取って参加
                             </p>
                             <p className="text-xs text-blue-600 text-center mt-1">
-                              🔄 自動フォールバック対応（ローカル → インターネット）
+                              {syncMode === "internet" 
+                                ? "🌐 インターネット同期（Firebase）" 
+                                : "🔄 自動フォールバック対応（ローカル → インターネット）"
+                              }
                             </p>
                             
                             {/* 招待URLの表示 */}
                             <div className="mt-3 space-y-2">
-                              <p className="text-xs text-gray-600 text-center">招待URL（自動フォールバック）:</p>
+                              <p className="text-xs text-gray-600 text-center">
+                                招待URL（{syncMode === "internet" ? "インターネット同期" : "自動フォールバック"}）:
+                              </p>
                               <div className="flex items-center gap-2">
                                 <code className="flex-1 p-2 bg-gray-100 rounded text-xs font-mono break-all">
                                   {generateInviteUrl() || "URL生成中..."}
@@ -593,7 +652,10 @@ export function StableSyncModal({
                                 </Button>
                               </div>
                               <p className="text-xs text-gray-500 text-center">
-                                ローカル接続失敗時は自動的にインターネット接続を試行
+                                {syncMode === "internet" 
+                                  ? "インターネット経由でどこからでも接続可能" 
+                                  : "ローカル接続失敗時は自動的にインターネット接続を試行"
+                                }
                               </p>
                             </div>
                           </div>
@@ -672,15 +734,7 @@ export function StableSyncModal({
                       />
                     </div>
                     <Button 
-                      onClick={syncMode === "local" ? handleStartHost : async () => {
-                        const sessionId = await createNewSession()
-                        if (sessionId) {
-                          toast({
-                            title: "セッション作成成功",
-                            description: `${hostName}としてFirebaseセッションを作成しました。`,
-                          })
-                        }
-                      }} 
+                      onClick={handleStartHost}
                       disabled={isLoading} 
                       className="w-full"
                     >
@@ -726,11 +780,11 @@ export function StableSyncModal({
 
                     <div className="space-y-2">
                       <Label htmlFor="roomId" className="text-sm">
-                        ルームID
+                        {syncMode === "local" ? "ルームID" : "セッションID"}
                       </Label>
                       <Input
                         id="roomId"
-                        placeholder="例: ABC123"
+                        placeholder={syncMode === "local" ? "例: ABC123" : "例: session123"}
                         value={roomIdInput}
                         onChange={(e) => setRoomIdInput(e.target.value.toUpperCase())}
                         onKeyDown={(e) => {
@@ -739,13 +793,13 @@ export function StableSyncModal({
                           }
                         }}
                         className="font-mono"
-                        maxLength={6}
+                        maxLength={syncMode === "local" ? 6 : 20}
                       />
                     </div>
 
                     <Button onClick={handleJoinRoom} disabled={isLoading || !roomIdInput.trim()} className="w-full">
                       <Users className="h-4 w-4 mr-2" />
-                      ルームに参加
+                      {syncMode === "local" ? "ルームに参加" : "セッションに参加"}
                     </Button>
                   </CardContent>
                 </Card>
