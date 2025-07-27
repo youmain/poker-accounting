@@ -112,20 +112,34 @@ export function useFirebaseSync(): FirebaseSyncResult {
   const joinSession = useCallback(async (sessionId: string) => {
     setIsLoading(true)
     try {
+      console.log("=== joinSession START ===")
+      console.log("Joining session:", sessionId)
+      
       // Firebase認証を実行
       await firebaseManager.signInAnonymously()
+      console.log("Firebase authentication completed")
       
       // セッションIDを設定
       setSessionId(sessionId)
       setIsHost(false) // 参加者として設定
+      console.log("Set sessionId and isHost: false")
 
-      // Firebaseからデータを取得
+      // Firebaseからオーナーの全データを取得
+      console.log("Fetching all data from Firebase...")
       const players = await firebaseManager.getData("players")
       const sessions = await firebaseManager.getData("sessions")
       const receipts = await firebaseManager.getData("receipts")
       const dailySales = await firebaseManager.getData("dailySales")
       const history = await firebaseManager.getData("history")
       const settings = await firebaseManager.getData("settings")
+
+      console.log("Data fetched from Firebase:")
+      console.log("- Players:", players?.length || 0, "items")
+      console.log("- Sessions:", sessions?.length || 0, "items")
+      console.log("- Receipts:", receipts?.length || 0, "items")
+      console.log("- DailySales:", dailySales?.length || 0, "items")
+      console.log("- History:", history?.length || 0, "items")
+      console.log("- Settings:", settings?.length || 0, "items")
 
       const firebaseData: ServerData = {
         players: players || [],
@@ -136,9 +150,20 @@ export function useFirebaseSync(): FirebaseSyncResult {
         settings: settings[0] || localStorageUtils.initializeServerData().settings,
       }
 
+      // ローカルストレージに同期データを保存
+      console.log("Saving synced data to local storage...")
+      localStorageUtils.saveDataType("players", firebaseData.players)
+      localStorageUtils.saveDataType("sessions", firebaseData.sessions)
+      localStorageUtils.saveDataType("receipts", firebaseData.receipts)
+      localStorageUtils.saveDataType("dailySales", firebaseData.dailySales)
+      localStorageUtils.saveDataType("history", firebaseData.history)
+      localStorageUtils.saveDataType("settings", firebaseData.settings)
+
       setServerData(firebaseData)
       setIsConnected(true)
       setConnectedDevices(1) // 初期は1台（自分だけ）
+      
+      console.log("Initial data synced and set")
       
       // 接続者として追加
       console.log("Adding participant as connected user...")
@@ -150,6 +175,7 @@ export function useFirebaseSync(): FirebaseSyncResult {
       
       console.log("=== joinSession COMPLETED ===")
       console.log("Final state - sessionId:", sessionId, "isHost: false, isConnected: true")
+      console.log("All data synchronized from owner")
       return true
     } catch (error) {
       console.error("セッション参加エラー:", error)
