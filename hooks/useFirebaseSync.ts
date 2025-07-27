@@ -55,19 +55,25 @@ export function useFirebaseSync(): FirebaseSyncResult {
 
   // 新しいセッションを作成（ホスト）
   const createNewSession = useCallback(async () => {
+    console.log("=== createNewSession START ===")
     setIsLoading(true)
     try {
       // Firebase認証を実行
       await firebaseManager.signInAnonymously()
+      console.log("Firebase authentication completed")
       
       // 新しいセッションIDを生成
       const newSessionId = `session-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
+      console.log("Generated sessionId:", newSessionId)
+      
       setSessionId(newSessionId)
       setIsHost(true) // ホストとして設定
+      console.log("Set sessionId and isHost")
 
       // ローカルデータを初期化してFirebaseに保存
       const initialData = initializeFromLocalStorage()
       if (initialData) {
+        console.log("Saving initial data to Firebase")
         await Promise.all([
           firebaseManager.saveData("players", initialData.players),
           firebaseManager.saveData("sessions", initialData.sessions),
@@ -77,10 +83,13 @@ export function useFirebaseSync(): FirebaseSyncResult {
           firebaseManager.saveData("settings", initialData.settings),
         ])
         setServerData(initialData)
+        console.log("Initial data saved and set")
       }
 
       setIsConnected(true)
       setConnectedDevices(1) // ホスト1台
+      console.log("=== createNewSession COMPLETED ===")
+      console.log("Final state - sessionId:", newSessionId, "isHost: true, isConnected: true")
       return newSessionId
     } catch (error) {
       console.error("セッション作成エラー:", error)
@@ -200,15 +209,15 @@ export function useFirebaseSync(): FirebaseSyncResult {
     initialize()
   }, [initializeFromLocalStorage])
 
-  // 接続状態の監視
-  useEffect(() => {
-    if (!isConnected && sessionId) {
-      // 接続が切れた場合、セッション状態をリセット
-      setSessionId("")
-      setIsHost(false)
-      setConnectedDevices(0)
-    }
-  }, [isConnected, sessionId])
+  // 接続状態の監視（一時的に無効化）
+  // useEffect(() => {
+  //   if (!isConnected && sessionId) {
+  //     // 接続が切れた場合、セッション状態をリセット
+  //     setSessionId("")
+  //     setIsHost(false)
+  //     setConnectedDevices(0)
+  //   }
+  // }, [isConnected, sessionId])
 
   return {
     isConnected,
