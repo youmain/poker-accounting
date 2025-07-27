@@ -30,8 +30,8 @@ export function useFirebaseSync(): FirebaseSyncResult {
         // ローカルストレージにも保存
         localStorageUtils.saveDataType(type, data)
 
-        // Firebaseに保存
-        if (isConnected) {
+        // Firebaseに保存（ホストのみが書き込み可能）
+        if (isConnected && isHost) {
           await firebaseManager.saveData(type, data)
         }
 
@@ -50,7 +50,7 @@ export function useFirebaseSync(): FirebaseSyncResult {
         return false
       }
     },
-    [isConnected],
+    [isConnected, isHost],
   )
 
   // 新しいセッションを作成（ホスト）
@@ -120,7 +120,8 @@ export function useFirebaseSync(): FirebaseSyncResult {
 
       setServerData(firebaseData)
       setIsConnected(true)
-      setConnectedDevices(2) // ホスト + 参加者
+      // 参加者の場合は、既存の接続数に1を加算
+      setConnectedDevices(prev => prev + 1)
       return true
     } catch (error) {
       console.error("セッション参加エラー:", error)
@@ -163,6 +164,7 @@ export function useFirebaseSync(): FirebaseSyncResult {
   const leaveSession = useCallback(async () => {
     try {
       setIsConnected(false)
+      setIsHost(false) // ホスト状態もリセット
       setSessionId("")
       setConnectedDevices(0)
       // ローカルデータで初期化
@@ -186,6 +188,8 @@ export function useFirebaseSync(): FirebaseSyncResult {
         const localData = initializeFromLocalStorage()
         setServerData(localData)
         setIsConnected(false) // 初期状態はオフライン
+        setIsHost(false) // 初期状態は参加者
+        setConnectedDevices(0) // 初期状態は0台
       } catch (error) {
         console.error("初期化エラー:", error)
       } finally {
@@ -195,6 +199,16 @@ export function useFirebaseSync(): FirebaseSyncResult {
 
     initialize()
   }, [initializeFromLocalStorage])
+
+  // 接続状態の監視
+  useEffect(() => {
+    if (!isConnected && sessionId) {
+      // 接続が切れた場合、セッション状態をリセット
+      setSessionId("")
+      setIsHost(false)
+      setConnectedDevices(0)
+    }
+  }, [isConnected, sessionId])
 
   return {
     isConnected,
