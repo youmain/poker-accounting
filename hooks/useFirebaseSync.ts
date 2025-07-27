@@ -93,7 +93,7 @@ export function useFirebaseSync(): FirebaseSyncResult {
       
       // 接続者として追加
       console.log("Adding host as connected user...")
-      await addConnectedUser(hostName || "オーナー", true)
+      await addConnectedUser(hostName || "オーナー", true, newSessionId)
       
       console.log("=== createNewSession COMPLETED ===")
       console.log("Final state - sessionId:", newSessionId, "isHost: true, isConnected: true")
@@ -140,7 +140,7 @@ export function useFirebaseSync(): FirebaseSyncResult {
       
       // 接続者として追加
       console.log("Adding participant as connected user...")
-      await addConnectedUser("参加者", false)
+      await addConnectedUser("参加者", false, sessionId)
       
       console.log("=== joinSession COMPLETED ===")
       console.log("Final state - sessionId:", sessionId, "isHost: false, isConnected: true")
@@ -198,13 +198,14 @@ export function useFirebaseSync(): FirebaseSyncResult {
   }, [initializeFromLocalStorage])
 
   // 接続者を追加
-  const addConnectedUser = useCallback(async (name: string, isHost: boolean) => {
+  const addConnectedUser = useCallback(async (name: string, isHost: boolean, currentSessionId?: string) => {
     console.log("=== addConnectedUser called ===")
-    console.log("sessionId:", sessionId)
+    const targetSessionId = currentSessionId || sessionId
+    console.log("sessionId:", targetSessionId)
     console.log("name:", name)
     console.log("isHost:", isHost)
     
-    if (!sessionId) {
+    if (!targetSessionId) {
       console.log("No sessionId available, skipping addConnectedUser")
       return
     }
@@ -214,12 +215,12 @@ export function useFirebaseSync(): FirebaseSyncResult {
         name,
         isHost,
         deviceId: `device-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-        sessionId
+        sessionId: targetSessionId
       }
       console.log("Adding connected user with data:", userData)
       
       await firebaseManager.addConnectedUser(userData)
-      console.log("Connected user added successfully:", { name, isHost, sessionId })
+      console.log("Connected user added successfully:", { name, isHost, sessionId: targetSessionId })
     } catch (error) {
       console.error("接続者追加エラー:", error)
     }
