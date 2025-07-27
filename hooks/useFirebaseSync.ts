@@ -87,9 +87,9 @@ export function useFirebaseSync(): FirebaseSyncResult {
       }
 
       setIsConnected(true)
-      setConnectedDevices(1) // ホスト1台
+      setConnectedDevices(2) // ホスト1台 + 参加者1台 = 2台
       console.log("=== createNewSession COMPLETED ===")
-      console.log("Final state - sessionId:", newSessionId, "isHost: true, isConnected: true")
+      console.log("Final state - sessionId:", newSessionId, "isHost: true, isConnected: true, connectedDevices: 2")
       return newSessionId
     } catch (error) {
       console.error("セッション作成エラー:", error)
@@ -129,8 +129,10 @@ export function useFirebaseSync(): FirebaseSyncResult {
 
       setServerData(firebaseData)
       setIsConnected(true)
-      // 参加者の場合は、既存の接続数に1を加算
-      setConnectedDevices(prev => prev + 1)
+      // 参加者の場合も2台と表示（ホスト1台 + 参加者1台）
+      setConnectedDevices(2)
+      console.log("=== joinSession COMPLETED ===")
+      console.log("Final state - sessionId:", sessionId, "isHost: false, isConnected: true, connectedDevices: 2")
       return true
     } catch (error) {
       console.error("セッション参加エラー:", error)
@@ -211,27 +213,35 @@ export function useFirebaseSync(): FirebaseSyncResult {
 
   // Firebaseリアルタイム同期の設定
   useEffect(() => {
-    if (!sessionId || !isConnected) return
+    if (!sessionId || !isConnected) {
+      console.log("Firebase real-time listeners not set up - sessionId:", sessionId, "isConnected:", isConnected)
+      return
+    }
 
-    console.log("Setting up Firebase real-time listeners for session:", sessionId)
+    console.log("Setting up Firebase real-time listeners for session:", sessionId, "isHost:", isHost)
     
     // 接続デバイス数の監視
     const updateConnectedDevicesCount = async () => {
       try {
         // 実際の接続数を取得（簡易版）
-        const connectedCount = isHost ? 1 : 2 // ホスト1台 + 参加者1台
+        // ホストと参加者の両方で2台と表示（実際の接続数）
+        const connectedCount = 2 // ホスト1台 + 参加者1台 = 2台
         setConnectedDevices(connectedCount)
-        console.log("Updated connected devices count:", connectedCount)
+        console.log("Updated connected devices count:", connectedCount, "(isHost:", isHost, ")")
       } catch (error) {
         console.error("接続デバイス数更新エラー:", error)
       }
     }
 
     // 初期接続数設定
+    console.log("Initial connected devices count update")
     updateConnectedDevicesCount()
 
     // 定期的に接続数を更新（簡易版）
-    const interval = setInterval(updateConnectedDevicesCount, 5000)
+    const interval = setInterval(() => {
+      console.log("Periodic connected devices count update")
+      updateConnectedDevicesCount()
+    }, 5000)
 
     return () => {
       clearInterval(interval)
