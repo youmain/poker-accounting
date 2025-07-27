@@ -75,7 +75,32 @@ export function useFirebaseSync(): FirebaseSyncResult {
       // ローカルデータを初期化してFirebaseに保存
       const initialData = initializeFromLocalStorage()
       if (initialData) {
+        console.log("Initial data from local storage:", {
+          players: initialData.players.length,
+          sessions: initialData.sessions.length,
+          receipts: initialData.receipts.length,
+          dailySales: initialData.dailySales.length,
+          history: initialData.history.length,
+          settings: initialData.settings
+        })
+        
+        // プレイヤーデータの詳細をログ出力
+        if (initialData.players.length > 0) {
+          console.log("Local players data:", initialData.players)
+        }
+        
         console.log("Saving initial data to Firebase")
+        // 初期データをFirebaseに保存（セッション固有）
+        console.log("Saving initial data to Firebase with sessionId:", newSessionId)
+        console.log("Initial data to save:", {
+          players: initialData.players.length,
+          sessions: initialData.sessions.length,
+          receipts: initialData.receipts.length,
+          dailySales: initialData.dailySales.length,
+          history: initialData.history.length,
+          settings: initialData.settings
+        })
+        
         await Promise.all([
           firebaseManager.saveSessionData("players", initialData.players, newSessionId),
           firebaseManager.saveSessionData("sessions", initialData.sessions, newSessionId),
@@ -84,6 +109,7 @@ export function useFirebaseSync(): FirebaseSyncResult {
           firebaseManager.saveSessionData("history", initialData.history, newSessionId),
           firebaseManager.saveSessionData("settings", initialData.settings, newSessionId),
         ])
+        console.log("All initial data saved to Firebase successfully")
         setServerData(initialData)
         console.log("Initial data saved and set")
       }
@@ -140,6 +166,17 @@ export function useFirebaseSync(): FirebaseSyncResult {
       console.log("- DailySales:", dailySales?.length || 0, "items")
       console.log("- History:", history?.length || 0, "items")
       console.log("- Settings:", settings?.length || 0, "items")
+      
+      // 詳細なデータ内容をログ出力
+      if (players && players.length > 0) {
+        console.log("Players data details:", players)
+      }
+      if (sessions && sessions.length > 0) {
+        console.log("Sessions data details:", sessions)
+      }
+      if (receipts && receipts.length > 0) {
+        console.log("Receipts data details:", receipts)
+      }
 
       const firebaseData: ServerData = {
         players: players || [],
