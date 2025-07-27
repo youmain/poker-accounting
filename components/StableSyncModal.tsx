@@ -83,41 +83,39 @@ export function StableSyncModal({
 
   // デバッグ用ログ
   useEffect(() => {
-    console.log("StableSyncModal state:", {
-      syncMode,
-      isConnected,
-      isHost,
-      stableConnected,
-      stableIsHost,
-      firebaseConnected,
-      firebaseIsHost,
-      sessionId,
-      roomId
-    })
+    console.log("=== StableSyncModal State ===")
+    console.log("syncMode:", syncMode)
+    console.log("isConnected:", isConnected)
+    console.log("isHost:", isHost)
+    console.log("stableConnected:", stableConnected)
+    console.log("stableIsHost:", stableIsHost)
+    console.log("firebaseConnected:", firebaseConnected)
+    console.log("firebaseIsHost:", firebaseIsHost)
+    console.log("sessionId:", sessionId)
+    console.log("roomId:", roomId)
     
     // QRコード表示条件のデバッグ
     const qrCondition1 = isHost
     const qrCondition2 = syncMode === "internet" && firebaseConnected && sessionId
     const shouldShowQR = qrCondition1 || qrCondition2
     
-    console.log("QR Code display conditions:", {
-      qrCondition1,
-      qrCondition2,
-      shouldShowQR,
-      syncMode,
-      firebaseConnected,
-      sessionId
-    })
+    console.log("=== QR Code Display Conditions ===")
+    console.log("qrCondition1 (isHost):", qrCondition1)
+    console.log("qrCondition2 (internet && connected && sessionId):", qrCondition2)
+    console.log("shouldShowQR:", shouldShowQR)
+    console.log("syncMode:", syncMode)
+    console.log("firebaseConnected:", firebaseConnected)
+    console.log("sessionId:", sessionId)
     
     // 詳細な条件チェック
-    console.log("Detailed QR conditions:", {
-      "syncMode === 'internet'": syncMode === "internet",
-      "firebaseConnected": firebaseConnected,
-      "sessionId exists": !!sessionId,
-      "sessionId value": sessionId,
-      "isHost": isHost,
-      "firebaseIsHost": firebaseIsHost
-    })
+    console.log("=== Detailed QR Conditions ===")
+    console.log("syncMode === 'internet':", syncMode === "internet")
+    console.log("firebaseConnected:", firebaseConnected)
+    console.log("sessionId exists:", !!sessionId)
+    console.log("sessionId value:", sessionId)
+    console.log("isHost:", isHost)
+    console.log("firebaseIsHost:", firebaseIsHost)
+    console.log("================================")
   }, [syncMode, isConnected, isHost, stableConnected, stableIsHost, firebaseConnected, firebaseIsHost, sessionId, roomId])
 
   // URLパラメータから招待情報を取得して自動接続
@@ -259,13 +257,12 @@ export function StableSyncModal({
       
       if (newSessionId) {
         console.log("Firebase session created successfully")
-        console.log("Session creation completed - checking state after creation")
-        console.log("Current state after session creation:", {
-          firebaseConnected,
-          firebaseIsHost,
-          sessionId,
-          isHost
-        })
+        console.log("=== Session Creation Completed ===")
+        console.log("firebaseConnected:", firebaseConnected)
+        console.log("firebaseIsHost:", firebaseIsHost)
+        console.log("sessionId:", sessionId)
+        console.log("isHost:", isHost)
+        console.log("================================")
         toast({
           title: "インターネットセッション開始成功",
           description: `${hostName}としてセッションID: ${newSessionId} を作成しました。`,
@@ -671,15 +668,15 @@ export function StableSyncModal({
 
                     {(() => {
                       const shouldShowQR = isHost || (syncMode === "internet" && firebaseConnected && sessionId)
-                      console.log("QR Code render condition check:", {
-                        shouldShowQR,
-                        isHost,
-                        syncMode,
-                        firebaseConnected,
-                        sessionId,
-                        condition1: isHost,
-                        condition2: syncMode === "internet" && firebaseConnected && sessionId
-                      })
+                      console.log("=== QR Code Render Condition Check ===")
+                      console.log("shouldShowQR:", shouldShowQR)
+                      console.log("isHost:", isHost)
+                      console.log("syncMode:", syncMode)
+                      console.log("firebaseConnected:", firebaseConnected)
+                      console.log("sessionId:", sessionId)
+                      console.log("condition1 (isHost):", isHost)
+                      console.log("condition2 (internet && connected && sessionId):", syncMode === "internet" && firebaseConnected && sessionId)
+                      console.log("=====================================")
                       return shouldShowQR
                     })() && (
                       <div className="pt-2 border-t">
