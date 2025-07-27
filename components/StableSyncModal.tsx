@@ -81,6 +81,21 @@ export function StableSyncModal({
   const isLoading = stableLoading || firebaseLoading
   const isHost = syncMode === "internet" ? firebaseIsHost : stableIsHost
 
+  // デバッグ用ログ
+  useEffect(() => {
+    console.log("StableSyncModal state:", {
+      syncMode,
+      isConnected,
+      isHost,
+      stableConnected,
+      stableIsHost,
+      firebaseConnected,
+      firebaseIsHost,
+      sessionId,
+      roomId
+    })
+  }, [syncMode, isConnected, isHost, stableConnected, stableIsHost, firebaseConnected, firebaseIsHost, sessionId, roomId])
+
   // URLパラメータから招待情報を取得して自動接続
   useEffect(() => {
     if (typeof window !== "undefined" && !urlChecked) {
@@ -616,7 +631,7 @@ export function StableSyncModal({
                       </div>
                     )}
 
-                    {isHost && (
+                    {(isHost || (syncMode === "internet" && firebaseConnected && sessionId)) && (
                       <div className="pt-2 border-t">
                         <div className="space-y-3">
                           <div>
@@ -630,7 +645,9 @@ export function StableSyncModal({
                           </div>
 
                           <div>
-                            <div className="text-sm text-gray-600 mb-2">招待用QRコード:</div>
+                            <div className="text-sm text-gray-600 mb-2">
+                              招待用QRコード: {syncMode === "internet" ? `(Firebase: ${firebaseIsHost ? "ホスト" : "参加者"})` : `(StableSync: ${stableIsHost ? "ホスト" : "参加者"})`}
+                            </div>
                             <div className="flex justify-center">
                               <img
                                 src={generateQRCodeUrl() || "/placeholder.svg?height=128&width=128"}
