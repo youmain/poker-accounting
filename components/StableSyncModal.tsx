@@ -45,7 +45,7 @@ export function StableSyncModal({
   const [hostName, setHostName] = useState("ホスト")
   const [welcomeMessage, setWelcomeMessage] = useState("")
   const [urlChecked, setUrlChecked] = useState(false)
-  const [syncMode, setSyncMode] = useState<"local" | "internet">("local")
+  const [syncMode, setSyncMode] = useState<"local" | "internet">("internet")
   const { toast } = useToast()
 
   const {
@@ -534,10 +534,9 @@ export function StableSyncModal({
         </DialogHeader>
 
         <Tabs defaultValue="status" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="status">状況</TabsTrigger>
             <TabsTrigger value="connect">接続</TabsTrigger>
-            <TabsTrigger value="sync">同期方式</TabsTrigger>
             {process.env.NODE_ENV === "development" && <TabsTrigger value="debug">デバッグ</TabsTrigger>}
           </TabsList>
 
@@ -759,11 +758,11 @@ export function StableSyncModal({
               <div className="space-y-4">
                 {/* 同期方式の表示 */}
                 <Alert>
-                  <AlertCircle className="h-4 w-4" />
+                  <Database className="h-4 w-4" />
                   <AlertDescription className="text-xs">
-                    現在の同期方式: <strong>{syncMode === "local" ? "ローカルネットワーク" : "インターネット"}</strong>
+                    <strong>インターネット同期（Firebase）</strong>を使用しています。
                     <br />
-                    「同期方式」タブで変更できます。
+                    インターネット経由でどこからでも接続可能です。
                   </AlertDescription>
                 </Alert>
 
@@ -792,17 +791,8 @@ export function StableSyncModal({
                       disabled={isLoading} 
                       className="w-full"
                     >
-                      {syncMode === "local" ? (
-                        <>
-                          <Wifi className="h-4 w-4 mr-2" />
-                          ホストとして開始
-                        </>
-                      ) : (
-                        <>
-                          <Database className="h-4 w-4 mr-2" />
-                          セッションとして開始
-                        </>
-                      )}
+                      <Database className="h-4 w-4 mr-2" />
+                      セッションとして開始
                     </Button>
                   </CardContent>
                 </Card>
@@ -853,7 +843,7 @@ export function StableSyncModal({
 
                     <Button onClick={handleJoinRoom} disabled={isLoading || !roomIdInput.trim()} className="w-full">
                       <Users className="h-4 w-4 mr-2" />
-                      {syncMode === "local" ? "ルームに参加" : "セッションに参加"}
+                      セッションに参加
                     </Button>
                   </CardContent>
                 </Card>
@@ -887,7 +877,8 @@ export function StableSyncModal({
             </Alert>
           </TabsContent>
 
-          <TabsContent value="sync" className="space-y-4">
+          {/* 同期方式タブを一時的に無効化 - インターネット同期のみに集中 */}
+          {/* <TabsContent value="sync" className="space-y-4">
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm flex items-center gap-2">
@@ -968,7 +959,7 @@ export function StableSyncModal({
                 </Alert>
               </CardContent>
             </Card>
-          </TabsContent>
+          </TabsContent> */}
 
           {process.env.NODE_ENV === "development" && (
             <TabsContent value="debug" className="space-y-4">
