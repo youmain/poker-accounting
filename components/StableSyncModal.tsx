@@ -567,12 +567,18 @@ export function StableSyncModal({
                       <span className="text-sm text-gray-600">接続デバイス:</span>
                       <div className="flex items-center gap-1">
                         <Users className="h-3 w-3" />
-                        <span className="text-sm">{syncConnectedDevices.length}台</span>
+                        <span className="text-sm">
+                          {syncMode === "internet" 
+                            ? firebaseConnectedDevices 
+                            : syncConnectedDevices.length
+                          }台
+                        </span>
                       </div>
                     </div>
 
                     {/* 参加者一覧 */}
-                    {syncConnectedDevices.length > 0 && (
+                    {((syncMode === "internet" && firebaseConnectedDevices > 0) || 
+                      (syncMode === "local" && syncConnectedDevices.length > 0)) && (
                       <div className="pt-2 border-t">
                         <div className="text-sm text-gray-600 mb-2">参加者一覧:</div>
                         <div className="space-y-2">
@@ -608,7 +614,7 @@ export function StableSyncModal({
                       </div>
                     )}
 
-                    {isHost && (
+                    {(isHost || (syncMode === "internet" && firebaseConnected)) && (
                       <div className="pt-2 border-t">
                         <div className="space-y-3">
                           <div>
