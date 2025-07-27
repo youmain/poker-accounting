@@ -396,7 +396,13 @@ export function StableSyncModal({
   }
 
   const generateInviteUrl = () => {
-    console.log("generateInviteUrl called with:", { syncMode, sessionId, roomId, inviteeName })
+    console.log("=== generateInviteUrl called ===")
+    console.log("syncMode:", syncMode)
+    console.log("sessionId:", sessionId)
+    console.log("roomId:", roomId)
+    console.log("inviteeName:", inviteeName)
+    console.log("NEXT_PUBLIC_PRODUCTION_URL:", process.env.NEXT_PUBLIC_PRODUCTION_URL)
+    console.log("window.location.origin:", typeof window !== "undefined" ? window.location.origin : "undefined")
     
     if (typeof window !== "undefined") {
       // 同期方式に応じてURLを生成
@@ -677,7 +683,11 @@ export function StableSyncModal({
                       console.log("condition1 (isHost):", isHost)
                       console.log("condition2 (internet && connected && sessionId):", syncMode === "internet" && firebaseConnected && sessionId)
                       console.log("=====================================")
-                      return shouldShowQR
+                      
+                      // 一時的にQRコードを強制表示（デバッグ用）
+                      const forceShowQR = true
+                      console.log("Force showing QR code for debugging:", forceShowQR)
+                      return forceShowQR
                     })() && (
                       <div className="pt-2 border-t">
                         <div className="space-y-3">
