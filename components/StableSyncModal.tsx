@@ -11,6 +11,7 @@ import { Separator } from "@/components/ui/separator"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useStableSync } from "@/hooks/useStableSync"
+import { useFirebaseSync } from "@/hooks/useFirebaseSync"
 import {
   Copy,
   Users,
@@ -44,11 +45,12 @@ export function StableSyncModal({
   const [hostName, setHostName] = useState("ホスト")
   const [welcomeMessage, setWelcomeMessage] = useState("")
   const [urlChecked, setUrlChecked] = useState(false)
+  const [syncMode, setSyncMode] = useState<"local" | "internet">("local")
   const { toast } = useToast()
 
   const {
-    isConnected,
-    isLoading,
+    isConnected: stableConnected,
+    isLoading: stableLoading,
     roomId,
     isHost,
     startHost,
@@ -62,6 +64,21 @@ export function StableSyncModal({
     connectedDevices: syncConnectedDevices,
   } = useStableSync()
 
+  const {
+    isConnected: firebaseConnected,
+    isLoading: firebaseLoading,
+    sessionId,
+    createNewSession,
+    joinSession,
+    leaveSession,
+    refreshData: firebaseRefreshData,
+    connectedDevices: firebaseConnectedDevices,
+  } = useFirebaseSync()
+
+  // 統合された状態
+  const isConnected = stableConnected || firebaseConnected
+  const isLoading = stableLoading || firebaseLoading
+
   // URLパラメータから招待情報を取得して自動接続
   useEffect(() => {
     if (typeof window !== "undefined" && !urlChecked) {
@@ -69,61 +86,83 @@ export function StableSyncModal({
       const urlParams = new URLSearchParams(window.location.search)
       const nameParam = urlParams.get("name")
       const roomParam = urlParams.get("room")
+      const sessionParam = urlParams.get("session")
 
       console.log("Raw URL params:", {
         nameParam,
         roomParam,
+        sessionParam,
         isConnected,
         fullUrl: window.location.href,
         search: window.location.search,
       })
 
-      if (nameParam && roomParam && !isConnected) {
+      if (nameParam && !isConnected) {
         try {
           const decodedName = decodeURIComponent(nameParam)
           console.log("Decoded name:", decodedName)
           console.log("Setting welcome message and auto-connecting for:", decodedName)
 
           setWelcomeMessage(`${decodedName}さん、こんにちは！自動接続中...`)
-          setRoomIdInput(roomParam.toUpperCase())
 
           // 自動接続を実行
           const autoConnect = async () => {
-            console.log("Starting auto-connection to room:", roomParam.toUpperCase())
-            const success = await joinRoom(roomParam.toUpperCase(), decodedName)
+            if (sessionParam) {
+              // Firebaseセッション接続
+              console.log("Starting Firebase auto-connection to session:", sessionParam)
+              setSyncMode("internet")
+              const success = await joinSession(sessionParam)
+              
+              if (success) {
+                console.log("Firebase auto-connection successful")
+                setWelcomeMessage(`${decodedName}さん、インターネット経由で接続完了！`)
+                toast({
+                  title: "自動接続成功",
+                  description: `${decodedName}さんとしてFirebaseセッションに接続しました。`,
+                })
+              } else {
+                console.log("Firebase auto-connection failed")
+                setWelcomeMessage(`${decodedName}さん、インターネット接続に失敗しました。`)
+                toast({
+                  title: "自動接続失敗",
+                  description: "Firebaseセッションが見つからないか、接続に失敗しました。",
+                  variant: "destructive",
+                })
+              }
+            } else if (roomParam) {
+              // StableSync接続
+              console.log("Starting StableSync auto-connection to room:", roomParam.toUpperCase())
+              setSyncMode("local")
+              setRoomIdInput(roomParam.toUpperCase())
+              const success = await joinRoom(roomParam.toUpperCase(), decodedName)
 
-            if (success) {
-              console.log("Auto-connection successful")
-              setWelcomeMessage(`${decodedName}さん、接続完了！データが共有されています。`)
-              toast({
-                title: "自動接続成功",
-                description: `${decodedName}さんとしてルーム ${roomParam.toUpperCase()} に接続しました。`,
-              })
-
-              // URLパラメータをクリア（履歴を汚さないため）
-              const newUrl = window.location.origin + window.location.pathname
-              window.history.replaceState({}, document.title, newUrl)
-
-              // 10秒後にウェルカムメッセージを消す
-              setTimeout(() => {
-                console.log("Clearing welcome message after auto-connection")
-                setWelcomeMessage("")
-              }, 10000)
-            } else {
-              console.log("Auto-connection failed")
-              setWelcomeMessage(`${decodedName}さん、接続に失敗しました。手動で接続してください。`)
-              toast({
-                title: "自動接続失敗",
-                description: "ルームが見つからないか、接続に失敗しました。手動で接続してください。",
-                variant: "destructive",
-              })
-
-              // 失敗時は7秒後にメッセージを消す
-              setTimeout(() => {
-                console.log("Clearing welcome message after failed auto-connection")
-                setWelcomeMessage("")
-              }, 7000)
+              if (success) {
+                console.log("StableSync auto-connection successful")
+                setWelcomeMessage(`${decodedName}さん、ローカルネットワーク経由で接続完了！`)
+                toast({
+                  title: "自動接続成功",
+                  description: `${decodedName}さんとしてルーム ${roomParam.toUpperCase()} に接続しました。`,
+                })
+              } else {
+                console.log("StableSync auto-connection failed")
+                setWelcomeMessage(`${decodedName}さん、ローカル接続に失敗しました。`)
+                toast({
+                  title: "自動接続失敗",
+                  description: "ルームが見つからないか、接続に失敗しました。",
+                  variant: "destructive",
+                })
+              }
             }
+
+            // URLパラメータをクリア（履歴を汚さないため）
+            const newUrl = window.location.origin + window.location.pathname
+            window.history.replaceState({}, document.title, newUrl)
+
+            // 10秒後にウェルカムメッセージを消す
+            setTimeout(() => {
+              console.log("Clearing welcome message after auto-connection")
+              setWelcomeMessage("")
+            }, 10000)
           }
 
           // 少し遅延してから自動接続（UIの準備を待つ）
@@ -136,12 +175,17 @@ export function StableSyncModal({
           }, 5000)
         }
       } else {
-        console.log("URL parameters not found or already connected:", { nameParam, roomParam, isConnected })
+        console.log("URL parameters not found or already connected:", { 
+          nameParam, 
+          roomParam, 
+          sessionParam, 
+          isConnected 
+        })
       }
 
       setUrlChecked(true)
     }
-  }, [isConnected, isOpen, urlChecked, joinRoom, toast])
+  }, [isConnected, isOpen, urlChecked, joinRoom, joinSession, toast])
 
   const handleStartHost = async () => {
     console.log("Starting host from modal as:", hostName)
@@ -372,9 +416,10 @@ export function StableSyncModal({
         </DialogHeader>
 
         <Tabs defaultValue="status" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="status">状況</TabsTrigger>
             <TabsTrigger value="connect">接続</TabsTrigger>
+            <TabsTrigger value="sync">同期方式</TabsTrigger>
             {process.env.NODE_ENV === "development" && <TabsTrigger value="debug">デバッグ</TabsTrigger>}
           </TabsList>
 
@@ -575,10 +620,22 @@ export function StableSyncModal({
           <TabsContent value="connect" className="space-y-4">
             {!isConnected && (
               <div className="space-y-4">
+                {/* 同期方式の表示 */}
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription className="text-xs">
+                    現在の同期方式: <strong>{syncMode === "local" ? "ローカルネットワーク" : "インターネット"}</strong>
+                    <br />
+                    「同期方式」タブで変更できます。
+                  </AlertDescription>
+                </Alert>
+
                 {/* ホスト開始 */}
                 <Card>
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-sm">新しいルームを作成</CardTitle>
+                    <CardTitle className="text-sm">
+                      {syncMode === "local" ? "新しいルームを作成" : "新しいセッションを作成"}
+                    </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
                     <div className="space-y-2">
@@ -593,9 +650,30 @@ export function StableSyncModal({
                         className="text-sm"
                       />
                     </div>
-                    <Button onClick={handleStartHost} disabled={isLoading} className="w-full">
-                      <Wifi className="h-4 w-4 mr-2" />
-                      ホストとして開始
+                    <Button 
+                      onClick={syncMode === "local" ? handleStartHost : async () => {
+                        const sessionId = await createNewSession()
+                        if (sessionId) {
+                          toast({
+                            title: "セッション作成成功",
+                            description: `${hostName}としてFirebaseセッションを作成しました。`,
+                          })
+                        }
+                      }} 
+                      disabled={isLoading} 
+                      className="w-full"
+                    >
+                      {syncMode === "local" ? (
+                        <>
+                          <Wifi className="h-4 w-4 mr-2" />
+                          ホストとして開始
+                        </>
+                      ) : (
+                        <>
+                          <Database className="h-4 w-4 mr-2" />
+                          セッションとして開始
+                        </>
+                      )}
                     </Button>
                   </CardContent>
                 </Card>
@@ -673,6 +751,89 @@ export function StableSyncModal({
                 </ul>
               </AlertDescription>
             </Alert>
+          </TabsContent>
+
+          <TabsContent value="sync" className="space-y-4">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Wifi className="h-4 w-4" />
+                  同期方式の選択
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-3">
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="radio"
+                      id="local"
+                      name="syncMode"
+                      value="local"
+                      checked={syncMode === "local"}
+                      onChange={(e) => setSyncMode(e.target.value as "local" | "internet")}
+                      className="w-4 h-4"
+                    />
+                    <Label htmlFor="local" className="flex items-center gap-2 cursor-pointer">
+                      <Wifi className="h-4 w-4" />
+                      <div>
+                        <div className="font-medium">ローカルネットワーク同期</div>
+                        <div className="text-xs text-gray-500">同じWi-Fi内のデバイス間で同期</div>
+                      </div>
+                    </Label>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="radio"
+                      id="internet"
+                      name="syncMode"
+                      value="internet"
+                      checked={syncMode === "internet"}
+                      onChange={(e) => setSyncMode(e.target.value as "local" | "internet")}
+                      className="w-4 h-4"
+                    />
+                    <Label htmlFor="internet" className="flex items-center gap-2 cursor-pointer">
+                      <Database className="h-4 w-4" />
+                      <div>
+                        <div className="font-medium">インターネット同期</div>
+                        <div className="text-xs text-gray-500">インターネット経由でどこからでも同期</div>
+                      </div>
+                    </Label>
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div className="space-y-2">
+                  <div className="text-sm font-medium">現在の接続状況</div>
+                  <div className="text-xs space-y-1">
+                    <div className="flex justify-between">
+                      <span>ローカル同期:</span>
+                      <Badge variant={stableConnected ? "default" : "secondary"} className="text-xs">
+                        {stableConnected ? "接続中" : "未接続"}
+                      </Badge>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>インターネット同期:</span>
+                      <Badge variant={firebaseConnected ? "default" : "secondary"} className="text-xs">
+                        {firebaseConnected ? "接続中" : "未接続"}
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription className="text-xs">
+                    <div className="font-medium mb-1">同期方式の特徴</div>
+                    <div className="space-y-1">
+                      <div><strong>ローカル同期:</strong> 高速・安全・無料、同じWi-Fi内のみ</div>
+                      <div><strong>インターネット同期:</strong> どこからでも接続可能、Firebase認証が必要</div>
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {process.env.NODE_ENV === "development" && (
