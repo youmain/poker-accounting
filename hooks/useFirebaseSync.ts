@@ -278,7 +278,7 @@ export function useFirebaseSync(): FirebaseSyncResult {
     
     // 接続者のリアルタイム監視
     console.log("Setting up real-time listener for session:", sessionId)
-    const unsubscribe = firebaseManager.onConnectedUsersChange(sessionId, (users) => {
+    const unsubscribeUsers = firebaseManager.onConnectedUsersChange(sessionId, (users) => {
       console.log("=== Connected users updated ===")
       console.log("Users count:", users.length)
       console.log("Users:", users)
@@ -287,8 +287,52 @@ export function useFirebaseSync(): FirebaseSyncResult {
       console.log("Updated connectedDevices to:", users.length)
     })
 
+    // データのリアルタイム同期を設定
+    console.log("Setting up real-time data listeners for session:", sessionId)
+    const unsubscribePlayers = firebaseManager.onDataChange("players", (players: any[]) => {
+      console.log("=== Players data updated ===")
+      console.log("Players:", players)
+      setServerData(prev => prev ? { ...prev, players: players || [] } : null)
+    })
+
+    const unsubscribeSessions = firebaseManager.onDataChange("sessions", (sessions: any[]) => {
+      console.log("=== Sessions data updated ===")
+      console.log("Sessions:", sessions)
+      setServerData(prev => prev ? { ...prev, sessions: sessions || [] } : null)
+    })
+
+    const unsubscribeReceipts = firebaseManager.onDataChange("receipts", (receipts: any[]) => {
+      console.log("=== Receipts data updated ===")
+      console.log("Receipts:", receipts)
+      setServerData(prev => prev ? { ...prev, receipts: receipts || [] } : null)
+    })
+
+    const unsubscribeDailySales = firebaseManager.onDataChange("dailySales", (dailySales: any[]) => {
+      console.log("=== DailySales data updated ===")
+      console.log("DailySales:", dailySales)
+      setServerData(prev => prev ? { ...prev, dailySales: dailySales || [] } : null)
+    })
+
+    const unsubscribeHistory = firebaseManager.onDataChange("history", (history: any[]) => {
+      console.log("=== History data updated ===")
+      console.log("History:", history)
+      setServerData(prev => prev ? { ...prev, history: history || [] } : null)
+    })
+
+    const unsubscribeSettings = firebaseManager.onDataChange("settings", (settings: any[]) => {
+      console.log("=== Settings data updated ===")
+      console.log("Settings:", settings)
+      setServerData(prev => prev ? { ...prev, settings: settings[0] || prev.settings } : null)
+    })
+
     return () => {
-      unsubscribe()
+      unsubscribeUsers()
+      unsubscribePlayers()
+      unsubscribeSessions()
+      unsubscribeReceipts()
+      unsubscribeDailySales()
+      unsubscribeHistory()
+      unsubscribeSettings()
       console.log("Cleaned up Firebase real-time listeners")
     }
   }, [sessionId, isConnected, isHost])

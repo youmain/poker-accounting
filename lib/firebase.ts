@@ -249,6 +249,17 @@ export class FirebaseManager {
     })
   }
 
+  // データのリアルタイム監視
+  onDataChange(type: keyof ServerData, callback: (data: any[]) => void): () => void {
+    return onSnapshot(collection(db, type.toString()), (snapshot: QuerySnapshot<DocumentData>) => {
+      const data = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }))
+      callback(data)
+    })
+  }
+
   // ログアウト
   async signOut(): Promise<void> {
     await auth.signOut()
