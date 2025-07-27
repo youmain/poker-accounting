@@ -673,23 +673,19 @@ export function StableSyncModal({
                     )}
 
                     {(() => {
-                      const shouldShowQR = isHost || (syncMode === "internet" && firebaseConnected && sessionId)
                       console.log("=== QR Code Render Condition Check ===")
-                      console.log("shouldShowQR:", shouldShowQR)
                       console.log("isHost:", isHost)
                       console.log("syncMode:", syncMode)
                       console.log("firebaseConnected:", firebaseConnected)
                       console.log("sessionId:", sessionId)
-                      console.log("condition1 (isHost):", isHost)
-                      console.log("condition2 (internet && connected && sessionId):", syncMode === "internet" && firebaseConnected && sessionId)
                       console.log("=====================================")
                       
-                      // 一時的にQRコードを強制表示（デバッグ用）
-                      const forceShowQR = true
-                      console.log("Force showing QR code for debugging:", forceShowQR)
-                      return forceShowQR
+                      // 完全に条件を無効化して強制表示
+                      console.log("FORCING QR CODE DISPLAY - ALL CONDITIONS DISABLED")
+                      return true
                     })() && (
                       <div className="pt-2 border-t">
+                        {(() => { console.log("=== QR CODE SECTION RENDERING ==="); return null; })()}
                         <div className="space-y-3">
                           <div>
                             <Label className="text-sm text-gray-600 block mb-1">招待する人の名前:</Label>
@@ -706,6 +702,13 @@ export function StableSyncModal({
                               招待用QRコード: {syncMode === "internet" ? `(Firebase: ${firebaseIsHost ? "ホスト" : "参加者"})` : `(StableSync: ${stableIsHost ? "ホスト" : "参加者"})`}
                             </div>
                             <div className="flex justify-center">
+                              {(() => { 
+                                const qrUrl = generateQRCodeUrl();
+                                console.log("=== QR CODE IMAGE ===");
+                                console.log("QR URL:", qrUrl);
+                                console.log("Using placeholder:", !qrUrl);
+                                return null;
+                              })()}
                               <img
                                 src={generateQRCodeUrl() || "/placeholder.svg?height=128&width=128"}
                                 alt="QR Code"
