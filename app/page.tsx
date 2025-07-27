@@ -73,7 +73,7 @@ import { HistoryModal } from "@/components/HistoryModal"
 import { SetupGuideModal } from "@/components/SetupGuideModal"
 import { StableSyncModal } from "@/components/StableSyncModal"
 import { FirebaseTestModal } from "@/components/FirebaseTestModal"
-import { FirebaseSyncModal } from "@/components/FirebaseSyncModal"
+
 import { formatCurrency } from "@/utils/receiptCalculations"
 
 export default function PokerManagementSystem() {
@@ -96,7 +96,7 @@ export default function PokerManagementSystem() {
   const [showEndOfDayModal, setShowEndOfDayModal] = useState(false)
   const [showStableSyncModal, setShowStableSyncModal] = useState(false)
   const [showFirebaseTestModal, setShowFirebaseTestModal] = useState(false)
-  const [showFirebaseSyncModal, setShowFirebaseSyncModal] = useState(false)
+
   const [selectedDailySales, setSelectedDailySales] = useState<DailySales | null>(null)
   const [playerSearchQuery, setPlayerSearchQuery] = useState("")
   const [historySearchQuery, setHistorySearchQuery] = useState("")
@@ -1931,18 +1931,7 @@ export default function PokerManagementSystem() {
               <Database className="h-4 w-4 mr-2" />
               Firebase接続テスト
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setShowFirebaseSyncModal(true)
-                setShowMobileMenu(false)
-              }}
-              className="w-full justify-start h-10"
-            >
-              <Database className="h-4 w-4 mr-2" />
-              インターネット同期
-            </Button>
+
             <Button
               variant="outline"
               size="sm"
@@ -2034,14 +2023,7 @@ export default function PokerManagementSystem() {
             <Calculator className="h-4 w-4" />
             <span className="text-sm sm:text-base">レーキ確定</span>
           </Button>
-          <Button
-            onClick={() => setShowFirebaseSyncModal(true)}
-            variant="outline"
-            className="flex items-center justify-center gap-2 h-10 sm:h-9"
-          >
-            <Database className="h-4 w-4" />
-            <span className="text-sm sm:text-base">インターネット同期</span>
-          </Button>
+
           {isOwnerMode && (
             <>
               <Button
@@ -2587,10 +2569,7 @@ export default function PokerManagementSystem() {
         onCloseAction={() => setShowFirebaseTestModal(false)}
       />
 
-      <FirebaseSyncModal
-        isOpen={showFirebaseSyncModal}
-        onCloseAction={() => setShowFirebaseSyncModal(false)}
-      />
+
     </div>
   )
 }
