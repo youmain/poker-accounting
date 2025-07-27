@@ -159,6 +159,8 @@ export class FirebaseManager {
   async saveData(type: keyof ServerData, data: any): Promise<void> {
     if (!auth.currentUser) throw new Error('ユーザーが認証されていません')
     
+    console.log(`Saving ${type} data to Firebase:`, data)
+    
     const docData = {
       ...data,
       userId: auth.currentUser.uid,
@@ -167,18 +169,61 @@ export class FirebaseManager {
     }
 
     await addDoc(collection(db, type.toString()), docData)
+    console.log(`${type} data saved successfully`)
+  }
+
+  // セッション固有のデータを保存
+  async saveSessionData(type: keyof ServerData, data: any, sessionId: string): Promise<void> {
+    if (!auth.currentUser) throw new Error('ユーザーが認証されていません')
+    
+    console.log(`Saving ${type} data to Firebase for session ${sessionId}:`, data)
+    
+    const docData = {
+      ...data,
+      sessionId: sessionId,
+      userId: auth.currentUser.uid,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    }
+
+    await addDoc(collection(db, type.toString()), docData)
+    console.log(`${type} data saved successfully for session ${sessionId}`)
   }
 
   // データを取得
   async getData(type: keyof ServerData): Promise<any[]> {
     try {
+      console.log(`Fetching ${type} data from Firebase...`)
       const querySnapshot = await getDocs(collection(db, type.toString()))
-      return querySnapshot.docs.map(doc => ({
+      const data = querySnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       }))
+      console.log(`Fetched ${data.length} ${type} items:`, data)
+      return data
     } catch (error) {
       console.error(`${type}データ取得エラー:`, error)
+      return []
+    }
+  }
+
+  // セッション固有のデータを取得
+  async getSessionData(type: keyof ServerData, sessionId: string): Promise<any[]> {
+    try {
+      console.log(`Fetching ${type} data from Firebase for session ${sessionId}...`)
+      const q = query(
+        collection(db, type.toString()),
+        where('sessionId', '==', sessionId)
+      )
+      const querySnapshot = await getDocs(q)
+      const data = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }))
+      console.log(`Fetched ${data.length} ${type} items for session ${sessionId}:`, data)
+      return data
+    } catch (error) {
+      console.error(`${type}セッションデータ取得エラー:`, error)
       return []
     }
   }

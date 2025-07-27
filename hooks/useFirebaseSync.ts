@@ -77,12 +77,12 @@ export function useFirebaseSync(): FirebaseSyncResult {
       if (initialData) {
         console.log("Saving initial data to Firebase")
         await Promise.all([
-          firebaseManager.saveData("players", initialData.players),
-          firebaseManager.saveData("sessions", initialData.sessions),
-          firebaseManager.saveData("receipts", initialData.receipts),
-          firebaseManager.saveData("dailySales", initialData.dailySales),
-          firebaseManager.saveData("history", initialData.history),
-          firebaseManager.saveData("settings", initialData.settings),
+          firebaseManager.saveSessionData("players", initialData.players, newSessionId),
+          firebaseManager.saveSessionData("sessions", initialData.sessions, newSessionId),
+          firebaseManager.saveSessionData("receipts", initialData.receipts, newSessionId),
+          firebaseManager.saveSessionData("dailySales", initialData.dailySales, newSessionId),
+          firebaseManager.saveSessionData("history", initialData.history, newSessionId),
+          firebaseManager.saveSessionData("settings", initialData.settings, newSessionId),
         ])
         setServerData(initialData)
         console.log("Initial data saved and set")
@@ -124,14 +124,14 @@ export function useFirebaseSync(): FirebaseSyncResult {
       setIsHost(false) // 参加者として設定
       console.log("Set sessionId and isHost: false")
 
-      // Firebaseからオーナーの全データを取得
-      console.log("Fetching all data from Firebase...")
-      const players = await firebaseManager.getData("players")
-      const sessions = await firebaseManager.getData("sessions")
-      const receipts = await firebaseManager.getData("receipts")
-      const dailySales = await firebaseManager.getData("dailySales")
-      const history = await firebaseManager.getData("history")
-      const settings = await firebaseManager.getData("settings")
+      // Firebaseからセッション固有のデータを取得
+      console.log("Fetching session-specific data from Firebase...")
+      const players = await firebaseManager.getSessionData("players", sessionId)
+      const sessions = await firebaseManager.getSessionData("sessions", sessionId)
+      const receipts = await firebaseManager.getSessionData("receipts", sessionId)
+      const dailySales = await firebaseManager.getSessionData("dailySales", sessionId)
+      const history = await firebaseManager.getSessionData("history", sessionId)
+      const settings = await firebaseManager.getSessionData("settings", sessionId)
 
       console.log("Data fetched from Firebase:")
       console.log("- Players:", players?.length || 0, "items")
