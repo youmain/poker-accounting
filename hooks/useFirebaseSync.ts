@@ -56,6 +56,9 @@ export function useFirebaseSync(): FirebaseSyncResult {
   const createNewSession = useCallback(async () => {
     setIsLoading(true)
     try {
+      // Firebase認証を実行
+      await firebaseManager.signInAnonymously()
+      
       // 新しいセッションIDを生成
       const newSessionId = `session-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
       setSessionId(newSessionId)
@@ -88,6 +91,9 @@ export function useFirebaseSync(): FirebaseSyncResult {
   const joinSession = useCallback(async (sessionId: string) => {
     setIsLoading(true)
     try {
+      // Firebase認証を実行
+      await firebaseManager.signInAnonymously()
+      
       // セッションIDを設定
       setSessionId(sessionId)
 
