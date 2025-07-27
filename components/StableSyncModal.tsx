@@ -613,7 +613,9 @@ export function StableSyncModal({
 
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-gray-600">役割:</span>
-                      <Badge variant={isHost ? "default" : "secondary"}>{isHost ? "ホスト" : "参加者"}</Badge>
+                      <Badge variant={(isHost || firebaseIsHost) ? "default" : "secondary"}>
+                        {(isHost || firebaseIsHost) ? "オーナー" : "参加者"}
+                      </Badge>
                     </div>
 
                     <div className="flex items-center justify-between">
@@ -675,13 +677,22 @@ export function StableSyncModal({
                     {(() => {
                       console.log("=== QR Code Render Condition Check ===")
                       console.log("isHost:", isHost)
+                      console.log("firebaseIsHost:", firebaseIsHost)
                       console.log("syncMode:", syncMode)
                       console.log("firebaseConnected:", firebaseConnected)
                       console.log("sessionId:", sessionId)
                       console.log("=====================================")
                       
-                      // 完全に条件を無効化して強制表示
-                      console.log("FORCING QR CODE DISPLAY - ALL CONDITIONS DISABLED")
+                      // ホストのみがQRコードを表示可能
+                      const isOwner = isHost || firebaseIsHost
+                      console.log("isOwner (can show QR):", isOwner)
+                      
+                      if (!isOwner) {
+                        console.log("NOT OWNER - QR code hidden")
+                        return false
+                      }
+                      
+                      console.log("IS OWNER - QR code will be shown")
                       return true
                     })() && (
                       <div className="pt-2 border-t">
@@ -699,7 +710,7 @@ export function StableSyncModal({
 
                           <div>
                             <div className="text-sm text-gray-600 mb-2">
-                              招待用QRコード: {syncMode === "internet" ? `(Firebase: ${firebaseIsHost ? "ホスト" : "参加者"})` : `(StableSync: ${stableIsHost ? "ホスト" : "参加者"})`}
+                              招待用QRコード（オーナー専用）
                             </div>
                             <div className="flex justify-center">
                               {(() => { 
@@ -753,6 +764,20 @@ export function StableSyncModal({
                           </div>
                         </div>
                       </div>
+                    )}
+
+                    {/* 参加者向けメッセージ */}
+                    {isConnected && !isHost && !firebaseIsHost && (
+                      <Alert>
+                        <User className="h-4 w-4" />
+                        <AlertDescription className="text-xs">
+                          <strong>参加者モード</strong>
+                          <br />
+                          データの閲覧と同期は可能ですが、QRコードの生成や招待はできません。
+                          <br />
+                          オーナーモードに切り替えるには、新しいセッションを作成してください。
+                        </AlertDescription>
+                      </Alert>
                     )}
 
                     <div className="flex gap-2">
