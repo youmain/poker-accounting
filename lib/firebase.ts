@@ -305,6 +305,22 @@ export class FirebaseManager {
     })
   }
 
+  // セッション固有のデータのリアルタイム監視
+  onSessionDataChange(type: keyof ServerData, sessionId: string, callback: (data: any[]) => void): () => void {
+    const q = query(
+      collection(db, type.toString()),
+      where('sessionId', '==', sessionId)
+    )
+    
+    return onSnapshot(q, (snapshot: QuerySnapshot<DocumentData>) => {
+      const data = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }))
+      callback(data)
+    })
+  }
+
   // ログアウト
   async signOut(): Promise<void> {
     await auth.signOut()
