@@ -150,14 +150,14 @@ export function useFirebaseSync(): FirebaseSyncResult {
       setIsHost(false) // 参加者として設定
       console.log("Set sessionId and isHost: false")
 
-      // Firebaseからセッション固有のデータを取得
-      console.log("Fetching session-specific data from Firebase...")
-      const players = await firebaseManager.getSessionData("players", sessionId)
-      const sessions = await firebaseManager.getSessionData("sessions", sessionId)
-      const receipts = await firebaseManager.getSessionData("receipts", sessionId)
-      const dailySales = await firebaseManager.getSessionData("dailySales", sessionId)
-      const history = await firebaseManager.getSessionData("history", sessionId)
-      const settings = await firebaseManager.getSessionData("settings", sessionId)
+      // Firebaseからオーナーの全データを取得（セッション固有でない）
+      console.log("Fetching all owner data from Firebase...")
+      const players = await firebaseManager.getData("players")
+      const sessions = await firebaseManager.getData("sessions")
+      const receipts = await firebaseManager.getData("receipts")
+      const dailySales = await firebaseManager.getData("dailySales")
+      const history = await firebaseManager.getData("history")
+      const settings = await firebaseManager.getData("settings")
 
       console.log("Data fetched from Firebase:")
       console.log("- Players:", players?.length || 0, "items")
@@ -350,39 +350,39 @@ export function useFirebaseSync(): FirebaseSyncResult {
       console.log("Updated connectedDevices to:", users.length)
     })
 
-    // セッション固有のデータのリアルタイム同期を設定
-    console.log("Setting up session-specific real-time data listeners for session:", sessionId)
-    const unsubscribePlayers = firebaseManager.onSessionDataChange("players", sessionId, (players: any[]) => {
+    // オーナーの全データのリアルタイム同期を設定
+    console.log("Setting up real-time data listeners for all owner data")
+    const unsubscribePlayers = firebaseManager.onDataChange("players", (players: any[]) => {
       console.log("=== Players data updated ===")
       console.log("Players:", players)
       setServerData(prev => prev ? { ...prev, players: players || [] } : null)
     })
 
-    const unsubscribeSessions = firebaseManager.onSessionDataChange("sessions", sessionId, (sessions: any[]) => {
+    const unsubscribeSessions = firebaseManager.onDataChange("sessions", (sessions: any[]) => {
       console.log("=== Sessions data updated ===")
       console.log("Sessions:", sessions)
       setServerData(prev => prev ? { ...prev, sessions: sessions || [] } : null)
     })
 
-    const unsubscribeReceipts = firebaseManager.onSessionDataChange("receipts", sessionId, (receipts: any[]) => {
+    const unsubscribeReceipts = firebaseManager.onDataChange("receipts", (receipts: any[]) => {
       console.log("=== Receipts data updated ===")
       console.log("Receipts:", receipts)
       setServerData(prev => prev ? { ...prev, receipts: receipts || [] } : null)
     })
 
-    const unsubscribeDailySales = firebaseManager.onSessionDataChange("dailySales", sessionId, (dailySales: any[]) => {
+    const unsubscribeDailySales = firebaseManager.onDataChange("dailySales", (dailySales: any[]) => {
       console.log("=== DailySales data updated ===")
       console.log("DailySales:", dailySales)
       setServerData(prev => prev ? { ...prev, dailySales: dailySales || [] } : null)
     })
 
-    const unsubscribeHistory = firebaseManager.onSessionDataChange("history", sessionId, (history: any[]) => {
+    const unsubscribeHistory = firebaseManager.onDataChange("history", (history: any[]) => {
       console.log("=== History data updated ===")
       console.log("History:", history)
       setServerData(prev => prev ? { ...prev, history: history || [] } : null)
     })
 
-    const unsubscribeSettings = firebaseManager.onSessionDataChange("settings", sessionId, (settings: any[]) => {
+    const unsubscribeSettings = firebaseManager.onDataChange("settings", (settings: any[]) => {
       console.log("=== Settings data updated ===")
       console.log("Settings:", settings)
       setServerData(prev => prev ? { ...prev, settings: settings[0] || prev.settings } : null)
