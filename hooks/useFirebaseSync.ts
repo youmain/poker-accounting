@@ -29,12 +29,17 @@ export function useFirebaseSync(): FirebaseSyncResult {
   const saveToServer = useCallback(
     async (type: keyof ServerData, data: any) => {
       try {
+        console.log(`Saving ${type} data to Firebase - isConnected: ${isConnected}, isHost: ${isHost}`)
+        
         // ローカルストレージにも保存
         localStorageUtils.saveDataType(type, data)
 
-        // Firebaseに保存（ホストのみが書き込み可能）
-        if (isConnected && isHost) {
+        // Firebaseに保存（接続中の全ユーザーが書き込み可能）
+        if (isConnected) {
           await firebaseManager.saveData(type, data)
+          console.log(`${type} data saved to Firebase successfully`)
+        } else {
+          console.log(`Not connected to Firebase, skipping ${type} save`)
         }
 
         // ローカルのステートも更新
