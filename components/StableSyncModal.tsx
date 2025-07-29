@@ -11,7 +11,7 @@ import { Separator } from "@/components/ui/separator"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useStableSync } from "@/hooks/useStableSync"
-import { useFirebaseSync } from "@/hooks/useFirebaseSync"
+import { useNewFirebaseSync } from "@/hooks/useNewFirebaseSync"
 import {
   Copy,
   Users,
@@ -81,7 +81,7 @@ export function StableSyncModal({
     connectedDevices: firebaseConnectedDevices,
     connectedUsers,
     serverData,
-  } = useFirebaseSync()
+  } = useNewFirebaseSync()
 
   // 統合された状態
   const isConnected = stableConnected || firebaseConnected

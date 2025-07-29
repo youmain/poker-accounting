@@ -46,9 +46,8 @@ import {
 import { AddPlayerModal } from "@/components/AddPlayerModal"
 import { SalesCalendar } from "@/components/SalesCalendar"
 import { useLocalStorage } from "@/hooks/useLocalStorage"
-import { useFirebaseSync } from "@/hooks/useFirebaseSync"
-import { useFirebaseAuth } from "@/hooks/useFirebaseAuth"
 import { useNewFirebaseSync } from '@/hooks/useNewFirebaseSync'
+import { useFirebaseAuth } from "@/hooks/useFirebaseAuth"
 import type {
   Player,
   GameSession,
@@ -196,6 +195,18 @@ export default function PokerManagementSystem() {
   const dailySales = isConnected && serverData ? serverData.dailySales : localDailySales
   const history = isConnected && serverData ? serverData.history : localHistory
   const systemSettings = isConnected && serverData ? serverData.settings : localSystemSettings
+
+  // ローカルストレージの同期
+  useEffect(() => {
+    if (serverData) {
+      setLocalPlayers(serverData.players)
+      setLocalGameSessions(serverData.sessions)
+      setLocalReceipts(serverData.receipts)
+      setLocalDailySales(serverData.dailySales)
+      setLocalHistory(serverData.history)
+      setLocalSystemSettings(serverData.settings)
+    }
+  }, [serverData])
 
   // デバッグ用：データ状態をログ出力
   useEffect(() => {

@@ -232,22 +232,54 @@ export function useNewFirebaseSync(): FirebaseSyncResult {
     
     if (!isConnected) {
       console.log('接続されていないため、ローカルストレージに保存')
-      return false
-    }
-    
-    try {
-      const success = await newFirebaseSync.saveData(type, data)
-      
-      if (success) {
-        setLastSyncTime(new Date())
-        console.log('データ保存完了')
+      // ローカルストレージに保存
+      try {
+        localStorage.setItem(`poker-${type}`, JSON.stringify(data))
+        console.log('ローカルストレージに保存完了')
         return true
-      } else {
-        console.error('データ保存に失敗しました')
+      } catch (error) {
+        console.error('ローカルストレージ保存エラー:', error)
         return false
       }
+    }
+    
+    // リトライ機能付きでFirebaseに保存
+    const maxRetries = 3
+    let lastError: Error | null = null
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`保存試行 ${attempt}/${maxRetries}`)
+        const success = await newFirebaseSync.saveData(type, data)
+        
+        if (success) {
+          setLastSyncTime(new Date())
+          console.log('データ保存完了')
+          return true
+        } else {
+          throw new Error('Firebase保存が失敗しました')
+        }
+      } catch (error) {
+        lastError = error as Error
+        console.error(`保存試行 ${attempt} 失敗:`, error)
+        
+        if (attempt < maxRetries) {
+          // 指数バックオフでリトライ
+          const delay = Math.pow(2, attempt) * 1000
+          console.log(`${delay}ms後にリトライします...`)
+          await new Promise(resolve => setTimeout(resolve, delay))
+        }
+      }
+    }
+    
+    // 全てのリトライが失敗した場合、ローカルストレージにフォールバック
+    console.error('全てのリトライが失敗、ローカルストレージにフォールバック')
+    try {
+      localStorage.setItem(`poker-${type}`, JSON.stringify(data))
+      console.log('ローカルストレージにフォールバック保存完了')
+      return true
     } catch (error) {
-      console.error('データ保存エラー:', error)
+      console.error('フォールバック保存も失敗:', error)
       return false
     }
   }, [isConnected])
@@ -384,7 +416,7 @@ export function useNewFirebaseSync(): FirebaseSyncResult {
     console.log('State:', state)
     
     setIsConnected(state.isConnected)
-    setSessionId(state.sessionId)
+    setSessionId(state.sessionId || null)
     setIsHost(state.currentUser?.isHost || false)
   }, [])
 
