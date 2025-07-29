@@ -48,6 +48,7 @@ import { SalesCalendar } from "@/components/SalesCalendar"
 import { useLocalStorage } from "@/hooks/useLocalStorage"
 import { useFirebaseSync } from "@/hooks/useFirebaseSync"
 import { useFirebaseAuth } from "@/hooks/useFirebaseAuth"
+import { useNewFirebaseSync } from '@/hooks/useNewFirebaseSync'
 import type {
   Player,
   GameSession,
@@ -173,7 +174,7 @@ export default function PokerManagementSystem() {
     joinSession,
     leaveSession,
     disconnectUser,
-  } = useFirebaseSync()
+  } = useNewFirebaseSync()
 
   // ローカルストレージ関連
   const [localPlayers, setLocalPlayers] = useState<Player[]>([])
