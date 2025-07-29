@@ -81,6 +81,8 @@ export function StableSyncModal({
     connectedDevices: firebaseConnectedDevices,
     connectedUsers,
     serverData,
+    saveAllDataToFirebase,
+    loadAllDataFromFirebase,
   } = useNewFirebaseSync()
 
   // 統合された状態
@@ -528,26 +530,99 @@ export function StableSyncModal({
   }
 
   const handleManualSync = async () => {
-    try {
-      if (syncMode === "internet") {
+    console.log('=== 手動同期実行 ===')
+    
+    if (syncMode === "internet" && firebaseConnected) {
+      try {
         await firebaseRefreshData()
         toast({
           title: "同期完了",
-          description: "データを更新しました。",
+          description: "データを最新に同期しました",
+        })
+      } catch (error) {
+        console.error("手動同期エラー:", error)
+        toast({
+          title: "同期エラー",
+          description: "同期に失敗しました",
+          variant: "destructive",
+        })
+      }
+    } else {
+      toast({
+        title: "接続エラー",
+        description: "データ共有に接続されていません",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleSaveAllDataToFirebase = async () => {
+    console.log('=== 全データをFirebaseに保存 ===')
+    
+    if (!firebaseConnected || !firebaseIsHost) {
+      toast({
+        title: "権限エラー",
+        description: "ホストのみが全データを保存できます",
+        variant: "destructive",
+      })
+      return
+    }
+    
+    try {
+      const success = await saveAllDataToFirebase()
+      if (success) {
+        toast({
+          title: "保存完了",
+          description: "全データをFirebaseに保存しました",
         })
       } else {
-        await refreshData()
-        const isUpToDate = await checkDataIntegrity()
         toast({
-          title: "同期完了",
-          description: isUpToDate ? "データは最新です。" : "データを更新しました。",
+          title: "保存エラー",
+          description: "データの保存に失敗しました",
+          variant: "destructive",
         })
       }
     } catch (error) {
-      console.error("Manual sync error:", error)
+      console.error("全データ保存エラー:", error)
       toast({
-        title: "同期エラー",
-        description: "データの同期に失敗しました。",
+        title: "保存エラー",
+        description: "データの保存に失敗しました",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleLoadAllDataFromFirebase = async () => {
+    console.log('=== Firebaseから全データを読み込み ===')
+    
+    if (!firebaseConnected) {
+      toast({
+        title: "接続エラー",
+        description: "Firebaseに接続されていません",
+        variant: "destructive",
+      })
+      return
+    }
+    
+    try {
+      const success = await loadAllDataFromFirebase()
+      if (success) {
+        toast({
+          title: "読み込み完了",
+          description: "Firebaseから全データを読み込みました",
+        })
+      } else {
+        toast({
+          title: "読み込みエラー",
+          description: "データの読み込みに失敗しました",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("全データ読み込みエラー:", error)
+      toast({
+        title: "読み込みエラー",
+        description: "データの読み込みに失敗しました",
         variant: "destructive",
       })
     }
@@ -1014,6 +1089,34 @@ export function StableSyncModal({
                         <RefreshCw className={`h-3 w-3 mr-2 ${isLoading ? "animate-spin" : ""}`} />
                         手動同期
                       </Button>
+
+                      {/* ホスト用：全データをFirebaseに保存 */}
+                      {firebaseConnected && firebaseIsHost && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={handleSaveAllDataToFirebase}
+                          disabled={isLoading}
+                          className="flex-1 bg-green-50 border-green-300 text-green-700 hover:bg-green-100"
+                        >
+                          <Database className="h-3 w-3 mr-2" />
+                          全データ保存
+                        </Button>
+                      )}
+
+                      {/* 参加者用：Firebaseから全データを読み込み */}
+                      {firebaseConnected && !firebaseIsHost && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={handleLoadAllDataFromFirebase}
+                          disabled={isLoading}
+                          className="flex-1 bg-blue-50 border-blue-300 text-blue-700 hover:bg-blue-100"
+                        >
+                          <Database className="h-3 w-3 mr-2" />
+                          全データ読み込み
+                        </Button>
+                      )}
 
                       <Button
                         size="sm"

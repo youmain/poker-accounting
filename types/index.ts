@@ -208,6 +208,8 @@ export interface FirebaseSyncResult extends BaseSyncResult {
   joinSession: (sessionId: string) => Promise<boolean>
   leaveSession: () => Promise<void>
   disconnectUser: (targetUid: string) => Promise<boolean>
+  saveAllDataToFirebase: () => Promise<boolean>
+  loadAllDataFromFirebase: () => Promise<boolean>
 }
 
 export interface WebSocketSyncResult extends BaseSyncResult {

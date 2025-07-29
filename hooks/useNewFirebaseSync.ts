@@ -362,6 +362,152 @@ export function useNewFirebaseSync(): FirebaseSyncResult {
     }
   }, [isHost])
 
+  // 手動同期機能
+  const saveAllDataToFirebase = useCallback(async (): Promise<boolean> => {
+    console.log('=== 全データをFirebaseに保存 ===')
+    
+    if (!isConnected || !isHost) {
+      console.error('ホストのみが全データを保存できます')
+      return false
+    }
+    
+    setIsLoading(true)
+    setSyncProgress({
+      isSyncing: true,
+      currentStep: '全データをFirebaseに保存中...',
+      totalSteps: 6,
+      currentStepIndex: 0
+    })
+    
+    try {
+      const currentData = serverData || {
+        players: localPlayers,
+        sessions: localSessions,
+        receipts: localReceipts,
+        dailySales: localDailySales,
+        history: localHistory,
+        settings: localSettings
+      }
+      
+      // 各データタイプを順次保存
+      const dataTypes: (keyof ServerData)[] = ['players', 'sessions', 'receipts', 'dailySales', 'history', 'settings']
+      
+      for (let i = 0; i < dataTypes.length; i++) {
+        const type = dataTypes[i]
+        console.log(`${type}データを保存中...`)
+        
+        setSyncProgress({
+          isSyncing: true,
+          currentStep: `${type}データを保存中...`,
+          totalSteps: 6,
+          currentStepIndex: i + 1
+        })
+        
+        const success = await newFirebaseSync.saveData(type, currentData[type])
+        if (!success) {
+          console.error(`${type}データの保存に失敗しました`)
+          return false
+        }
+        
+        console.log(`${type}データ保存完了`)
+      }
+      
+      setSyncProgress({
+        isSyncing: false,
+        currentStep: '全データ保存完了',
+        totalSteps: 6,
+        currentStepIndex: 6
+      })
+      
+      setLastSyncTime(new Date())
+      console.log('全データ保存完了')
+      return true
+    } catch (error) {
+      console.error('全データ保存エラー:', error)
+      return false
+    } finally {
+      setIsLoading(false)
+    }
+  }, [isConnected, isHost, serverData, localPlayers, localSessions, localReceipts, localDailySales, localHistory, localSettings])
+
+  const loadAllDataFromFirebase = useCallback(async (): Promise<boolean> => {
+    console.log('=== Firebaseから全データを読み込み ===')
+    
+    if (!isConnected) {
+      console.error('接続されていません')
+      return false
+    }
+    
+    setIsLoading(true)
+    setSyncProgress({
+      isSyncing: true,
+      currentStep: 'Firebaseから全データを読み込み中...',
+      totalSteps: 6,
+      currentStepIndex: 0
+    })
+    
+    try {
+      const dataTypes: (keyof ServerData)[] = ['players', 'sessions', 'receipts', 'dailySales', 'history', 'settings']
+      const loadedData: Partial<ServerData> = {}
+      
+      for (let i = 0; i < dataTypes.length; i++) {
+        const type = dataTypes[i]
+        console.log(`${type}データを読み込み中...`)
+        
+        setSyncProgress({
+          isSyncing: true,
+          currentStep: `${type}データを読み込み中...`,
+          totalSteps: 6,
+          currentStepIndex: i + 1
+        })
+        
+        const data = await newFirebaseSync.getData(type)
+        console.log(`${type}データ読み込み結果:`, data.length, '件')
+        
+        if (type === 'settings') {
+          loadedData[type] = data[0] || localSettings
+        } else {
+          loadedData[type] = data
+        }
+      }
+      
+      // 完全なServerDataオブジェクトを作成
+      const completeData: ServerData = {
+        players: loadedData.players || [],
+        sessions: loadedData.sessions || [],
+        receipts: loadedData.receipts || [],
+        dailySales: loadedData.dailySales || [],
+        history: loadedData.history || [],
+        settings: loadedData.settings || localSettings
+      }
+      
+      setServerData(completeData)
+      setLastSyncTime(new Date())
+      
+      setSyncProgress({
+        isSyncing: false,
+        currentStep: '全データ読み込み完了',
+        totalSteps: 6,
+        currentStepIndex: 6
+      })
+      
+      console.log('全データ読み込み完了:', {
+        players: completeData.players.length,
+        sessions: completeData.sessions.length,
+        receipts: completeData.receipts.length,
+        dailySales: completeData.dailySales.length,
+        history: completeData.history.length
+      })
+      
+      return true
+    } catch (error) {
+      console.error('全データ読み込みエラー:', error)
+      return false
+    } finally {
+      setIsLoading(false)
+    }
+  }, [isConnected, localSettings])
+
   // リアルタイムリスナーの設定
   useEffect(() => {
     console.log('=== リアルタイムリスナー設定 ===')
@@ -493,5 +639,9 @@ export function useNewFirebaseSync(): FirebaseSyncResult {
     joinSession,
     leaveSession,
     disconnectUser,
+
+    // 手動同期機能
+    saveAllDataToFirebase,
+    loadAllDataFromFirebase,
   }
 } 
