@@ -205,7 +205,7 @@ export interface FirebaseSyncResult extends BaseSyncResult {
     currentStepIndex: number
   } | null
   createNewSession: (hostName?: string) => Promise<string | null>
-  joinSession: (sessionId: string) => Promise<boolean>
+  joinSession: (sessionId: string, participantName?: string) => Promise<boolean>
   leaveSession: () => Promise<void>
   disconnectUser: (targetUid: string) => Promise<boolean>
   saveAllDataToFirebase: () => Promise<boolean>

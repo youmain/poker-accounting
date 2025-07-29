@@ -285,7 +285,7 @@ export function StableSyncModal({
     if (syncMode === "internet") {
       // Firebaseセッション作成
       console.log("Creating Firebase session...")
-      const newSessionId = await createNewSession()
+      const newSessionId = await createNewSession(hostName)
       console.log("Firebase session creation result:", { newSessionId })
       
       if (newSessionId) {
@@ -339,7 +339,8 @@ export function StableSyncModal({
         window.history.replaceState({}, "", url.toString())
       }
       
-      const success = await joinSession(roomIdInput.trim())
+      const participantName = inviteeName.trim() || "参加者"
+      const success = await joinSession(roomIdInput.trim(), participantName)
       if (success) {
         setRoomIdInput("")
         setInviteeName("")
@@ -380,7 +381,7 @@ export function StableSyncModal({
       } else {
         toast({
           title: "入力エラー",
-          description: "6文字のルームIDを入力してください。",
+          description: "ルームIDは6文字で入力してください。",
           variant: "destructive",
         })
       }
