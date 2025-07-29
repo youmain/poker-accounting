@@ -142,6 +142,12 @@ export function useFirebaseSync(): FirebaseSyncResult {
         history: ownerData.history?.length || 0
       })
       
+      // 即座にserverDataの状態を確認
+      setTimeout(() => {
+        console.log("=== serverData state check after setServerData ===")
+        console.log("serverData should now be loaded with owner data")
+      }, 100)
+      
       // ローカルストレージにも保存
       localStorageUtils.saveReceivedData(ownerData, setServerData)
       console.log("Data saved to localStorage")
@@ -263,12 +269,19 @@ export function useFirebaseSync(): FirebaseSyncResult {
         currentStepIndex: 2
       })
       
-      // オーナーの全データを取得して同期
-      const success = await fetchAndSyncOwnerData(targetSessionId)
-      if (!success) {
-        console.error("Failed to fetch owner data")
-        setSyncProgress(null)
-        return false
+      // オーナーのデータを取得して同期
+      console.log("=== 参加者としてセッションに参加 ===")
+      console.log("Participant name:", participantName)
+      console.log("Session ID:", targetSessionId)
+      
+      const syncSuccess = await fetchAndSyncOwnerData(targetSessionId)
+      console.log("fetchAndSyncOwnerData result:", syncSuccess)
+      
+      if (syncSuccess) {
+        console.log("✅ Owner data sync completed successfully")
+        console.log("serverData should now contain owner's data")
+      } else {
+        console.log("❌ Owner data sync failed")
       }
 
       setIsConnected(true)

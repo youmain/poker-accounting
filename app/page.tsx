@@ -189,6 +189,16 @@ export default function PokerManagementSystem() {
   const history = isConnected && serverData ? serverData.history : localHistory
   const systemSettings = isConnected && serverData ? serverData.settings : localSystemSettings
 
+  // デバッグ用：データ状態をログ出力
+  useEffect(() => {
+    console.log("=== Data state debug ===")
+    console.log("isConnected:", isConnected)
+    console.log("serverData:", serverData ? "loaded" : "null")
+    console.log("players from serverData:", serverData?.players?.length || 0)
+    console.log("localPlayers:", localPlayers?.length || 0)
+    console.log("final players count:", players?.length || 0)
+  }, [isConnected, serverData, localPlayers, players])
+
   // データ更新関数（共有データを最優先）
   const setPlayers = async (newPlayers: Player[] | ((prev: Player[]) => Player[])) => {
     const updatedPlayers = typeof newPlayers === "function" ? newPlayers(players || []) : newPlayers
