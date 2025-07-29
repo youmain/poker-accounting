@@ -97,11 +97,12 @@ export function PlayerDetailModal({
   const handleStackAdjustment = (type: "add" | "subtract") => {
     if (adjustmentAmount > 0 && adjustmentNote.trim()) {
       const transaction: Omit<StackTransaction, "id"> = {
-        playerId: player.id,
+        date: new Date().toISOString().split('T')[0],
+        time: new Date().toLocaleTimeString(),
         type: type === "add" ? "buy-in" : "cash-out",
         amount: adjustmentAmount,
+        balance: (player.currentChips || 0) + (type === "add" ? adjustmentAmount : -adjustmentAmount),
         note: adjustmentNote,
-        timestamp: new Date().toISOString(),
       }
       onAddStackTransaction(player.id, transaction)
       setAdjustmentAmount(0)
@@ -231,24 +232,10 @@ export function PlayerDetailModal({
                     {completedSessions.map((session) => (
                       <div key={session.id} className="p-3 border rounded-lg">
                         <div className="grid grid-cols-2 gap-2 text-sm">
-                          <div>開始: {new Date(session.startTime).toLocaleString()}</div>
-                          <div>終了: {session.endTime ? new Date(session.endTime).toLocaleString() : "-"}</div>
-                          <div>開始チップ: ¥{(session.startingChips || 0).toLocaleString()}</div>
-                          <div>終了チップ: ¥{session.finalChips?.toLocaleString() || "-"}</div>
-                          <div className="col-span-2">
-                            損益:{" "}
-                            <span
-                              className={
-                                session.finalChips && session.finalChips - session.startingChips >= 0
-                                  ? "text-green-600"
-                                  : "text-red-600"
-                              }
-                            >
-                              {session.finalChips
-                                ? `${session.finalChips - session.startingChips >= 0 ? "+" : ""}¥${(session.finalChips - session.startingChips).toLocaleString()}`
-                                : "-"}
-                            </span>
-                          </div>
+                          <div>開始時間: {session.startTime.toLocaleString()}</div>
+                          <div>終了時間: {session.endTime?.toLocaleString() || "進行中"}</div>
+                          <div>買い込み: ¥{(session.buyIn || 0).toLocaleString()}</div>
+                          <div>最終チップ: ¥{(session.finalChips || 0).toLocaleString()}</div>
                         </div>
                       </div>
                     ))}
