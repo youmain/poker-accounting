@@ -382,10 +382,16 @@ export class NewFirebaseSync {
 
   // 現在の状態を取得
   getCurrentState() {
+    const isConnected = !!this.currentSessionId && !!this.currentUser
+    console.log('=== getCurrentState ===')
+    console.log('currentSessionId:', this.currentSessionId)
+    console.log('currentUser:', this.currentUser)
+    console.log('isConnected:', isConnected)
+    
     return {
       sessionId: this.currentSessionId,
       currentUser: this.currentUser,
-      isConnected: !!this.currentSessionId
+      isConnected
     }
   }
 }

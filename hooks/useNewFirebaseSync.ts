@@ -362,14 +362,15 @@ export function useNewFirebaseSync(): FirebaseSyncResult {
     }
   }, [isHost])
 
-  // リアルタイムリスナー設定
+  // リアルタイムリスナーの設定
   useEffect(() => {
     console.log('=== リアルタイムリスナー設定 ===')
     console.log('SessionId:', sessionId)
     console.log('IsConnected:', isConnected)
     
-    if (!sessionId || !isConnected) {
-      console.log('リスナー設定をスキップ - セッションIDまたは接続状態が不正')
+    // セッションIDがない場合はスキップ
+    if (!sessionId) {
+      console.log('リスナー設定をスキップ - セッションIDがありません')
       return
     }
     
@@ -433,18 +434,41 @@ export function useNewFirebaseSync(): FirebaseSyncResult {
       unsubscribeUsers()
       unsubscribes.forEach(unsubscribe => unsubscribe())
     }
-  }, [sessionId, isConnected, localSettings])
+  }, [sessionId, localSettings])
 
   // 接続状態の監視
   useEffect(() => {
-    const state = newFirebaseSync.getCurrentState()
-    console.log('=== 接続状態確認 ===')
-    console.log('State:', state)
+    const checkConnection = () => {
+      const state = newFirebaseSync.getCurrentState()
+      console.log('=== 接続状態確認 ===')
+      console.log('State:', state)
+      
+      const wasConnected = isConnected
+      const wasSessionId = sessionId
+      
+      setIsConnected(state.isConnected)
+      setSessionId(state.sessionId || null)
+      setIsHost(state.currentUser?.isHost || false)
+      
+      // 接続状態が変わった場合はログ出力
+      if (wasConnected !== state.isConnected || wasSessionId !== (state.sessionId || null)) {
+        console.log('接続状態が変更されました:', {
+          wasConnected,
+          isConnected: state.isConnected,
+          wasSessionId,
+          sessionId: state.sessionId || null
+        })
+      }
+    }
     
-    setIsConnected(state.isConnected)
-    setSessionId(state.sessionId || null)
-    setIsHost(state.currentUser?.isHost || false)
-  }, [])
+    // 初回チェック
+    checkConnection()
+    
+    // 定期的にチェック（1秒間隔）
+    const interval = setInterval(checkConnection, 1000)
+    
+    return () => clearInterval(interval)
+  }, [isConnected, sessionId])
 
   return {
     // 基本状態
