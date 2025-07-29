@@ -724,6 +724,18 @@ export function StableSyncModal({
                   <div className="text-xs text-red-600">
                     🔍 デバッグ: 受信データ = {serverData ? `プレイヤー${serverData.players?.length || 0}件, 伝票${serverData.receipts?.length || 0}件` : "なし"}
                   </div>
+                  <div className="text-xs text-red-600">
+                    🔍 デバッグ: リスナー設定 = {sessionId ? "あり" : "なし"}
+                  </div>
+                  <div className="text-xs text-red-600">
+                    🔍 デバッグ: 接続状態 = {isConnected ? "接続中" : "未接続"}
+                  </div>
+                  <div className="text-xs text-red-600">
+                    🔍 デバッグ: ホスト状態 = {isHost ? "ホスト" : "参加者"}
+                  </div>
+                  <div className="text-xs text-red-600">
+                    🔍 デバッグ: セッションID = {sessionId || "なし"}
+                  </div>
                 </div>
               </AlertDescription>
             </Alert>
@@ -830,7 +842,7 @@ export function StableSyncModal({
                                   </Badge>
                                 )}
                                 <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                                {disconnectUser && isHost && !user.isHost && (
+                                {disconnectUser && (isHost || firebaseIsHost) && !user.isHost && (
                                   <Button
                                     variant="outline"
                                     size="sm"
@@ -849,6 +861,17 @@ export function StableSyncModal({
                                     切断
                                   </Button>
                                 )}
+                                {/* デバッグ情報 */}
+                                {(() => {
+                                  console.log("=== Disconnect Button Debug ===")
+                                  console.log("disconnectUser:", !!disconnectUser)
+                                  console.log("isHost:", isHost)
+                                  console.log("firebaseIsHost:", firebaseIsHost)
+                                  console.log("user.isHost:", user.isHost)
+                                  console.log("user.name:", user.name)
+                                  console.log("Should show button:", disconnectUser && (isHost || firebaseIsHost) && !user.isHost)
+                                  return null
+                                })()}
                               </div>
                             </div>
                           ))}

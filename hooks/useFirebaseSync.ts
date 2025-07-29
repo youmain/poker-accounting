@@ -440,8 +440,10 @@ export function useFirebaseSync(): FirebaseSyncResult {
     // プレイヤーデータの監視
     const unsubscribePlayers = firebaseManager.onSessionDataChange('players', sessionId, (data) => {
       console.log("=== Players session data updated ===")
-      console.log("Players:", data)
-      console.log("Previous serverData:", serverData)
+      console.log("Data received:", data)
+      console.log("Data length:", data.length)
+      console.log("Previous serverData players:", serverData?.players?.length || 0)
+      console.log("Timestamp:", new Date().toLocaleTimeString())
       setServerData(prev => {
         const newData = prev ? { ...prev, players: data } : { 
           players: data, 
@@ -456,11 +458,12 @@ export function useFirebaseSync(): FirebaseSyncResult {
             currentBusinessDate: new Date().toISOString().split("T")[0]
           }
         }
-        console.log("New serverData:", newData)
+        console.log("New serverData players count:", newData.players.length)
         return newData
       })
       localStorageUtils.saveDataType('players', data)
       setLastSyncTime(new Date())
+      console.log("Last sync time updated to:", new Date().toLocaleTimeString())
     })
 
     // セッションデータの監視
@@ -585,21 +588,27 @@ export function useFirebaseSync(): FirebaseSyncResult {
   }, [sessionId, isConnected]) // isHostを依存配列から削除
 
   return {
+    // 基本状態
     isConnected,
     isLoading,
     serverData,
-    sessionId,
+    lastSyncTime,
+    syncProgress,
+    connectedUsers,
     connectedDevices,
     isHost,
-    connectedUsers,
-    lastSyncTime,
-    syncVersion: 2.0,
-    syncProgress,
+    sessionId,
+    firebaseConnected: isConnected,
+    firebaseIsHost: isHost,
+
+    // 基本機能
     saveToServer,
+    refreshData,
+
+    // セッション管理
     createNewSession,
     joinSession,
     leaveSession,
-    refreshData,
     disconnectUser,
   }
 }
