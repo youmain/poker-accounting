@@ -646,7 +646,9 @@ export function StableSyncModal({
                   <div>firebaseIsHost: {firebaseIsHost ? "true" : "false"}</div>
                   <div>firebaseSyncProgress: {firebaseSyncProgress ? "あり" : "なし"}</div>
                   <div>リアルタイムリスナー: {sessionId && isConnected ? "設定済み" : "未設定"}</div>
-                  <div>最終同期時刻: {lastSyncTime ? lastSyncTime.toLocaleTimeString() : "なし"}</div>
+                  <div className="text-xs text-red-600">
+                    🔍 デバッグ: 最終更新 = {lastSyncTime ? lastSyncTime.toLocaleTimeString() : "なし"}
+                  </div>
                 </div>
               </AlertDescription>
             </Alert>
@@ -735,6 +737,15 @@ export function StableSyncModal({
                   </div>
                   <div className="text-xs text-red-600">
                     🔍 デバッグ: セッションID = {sessionId || "なし"}
+                  </div>
+                  <div className="text-xs text-red-600">
+                    🔍 デバッグ: 最終更新 = {lastSyncTime ? lastSyncTime.toLocaleTimeString() : "なし"}
+                  </div>
+                  <div className="text-xs text-red-600">
+                    🔍 デバッグ: 接続ユーザー数 = {connectedUsers?.length || 0}
+                  </div>
+                  <div className="text-xs text-red-600">
+                    🔍 デバッグ: 同期進行状況 = {firebaseSyncProgress ? `${firebaseSyncProgress.currentStep} (${firebaseSyncProgress.currentStepIndex}/${firebaseSyncProgress.totalSteps})` : "なし"}
                   </div>
                 </div>
               </AlertDescription>

@@ -189,9 +189,19 @@ export class NewFirebaseSync {
         updatedBy: this.currentUser?.uid
       }
       
-      await setDoc(doc(db, type.toString(), docId), docData)
+      // 確実に保存するため、setDocを使用
+      await setDoc(doc(db, type.toString(), docId), docData, { merge: true })
       console.log('データ保存完了:', docId)
-      return true
+      
+      // 保存確認のため、即座に読み取り
+      const savedDoc = await getDoc(doc(db, type.toString(), docId))
+      if (savedDoc.exists()) {
+        console.log('保存確認完了')
+        return true
+      } else {
+        console.error('保存確認失敗')
+        return false
+      }
     } catch (error) {
       console.error('データ保存エラー:', error)
       return false
@@ -252,6 +262,31 @@ export class NewFirebaseSync {
     
     console.log('リスナー設定:', `${type.toString()}/${docId}`)
     
+    // 即座に現在のデータを取得してコールバックを実行
+    getDoc(docRef).then((docSnapshot) => {
+      if (docSnapshot.exists()) {
+        const docData = docSnapshot.data()
+        const jsonData = docData.data || "[]"
+        
+        let data: any[]
+        try {
+          data = JSON.parse(jsonData)
+        } catch (error) {
+          console.error('JSON解析エラー:', error)
+          data = []
+        }
+        
+        console.log('初期データ取得:', data.length, '件')
+        callback(Array.isArray(data) ? data : [])
+      } else {
+        console.log('初期データなし')
+        callback([])
+      }
+    }).catch((error) => {
+      console.error('初期データ取得エラー:', error)
+      callback([])
+    })
+    
     const unsubscribe = onSnapshot(docRef, (docSnapshot) => {
       console.log(`=== ${type} データ更新 ===`)
       console.log('Document exists:', docSnapshot.exists())
@@ -278,6 +313,8 @@ export class NewFirebaseSync {
       callback(Array.isArray(data) ? data : [])
     }, (error) => {
       console.error('リスナーエラー:', error)
+      // エラー時も空配列をコールバック
+      callback([])
     })
     
     this.listeners.set(type, unsubscribe)

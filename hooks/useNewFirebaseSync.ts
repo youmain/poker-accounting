@@ -155,7 +155,10 @@ export function useNewFirebaseSync(): FirebaseSyncResult {
       const ownerData: Partial<ServerData> = {}
       
       for (const type of dataTypes) {
+        console.log(`${type}データ取得中...`)
         const data = await newFirebaseSync.getData(type)
+        console.log(`${type}データ取得結果:`, data.length, '件')
+        
         if (type === 'settings') {
           ownerData[type] = data[0] || localSettings
         } else {
@@ -168,6 +171,9 @@ export function useNewFirebaseSync(): FirebaseSyncResult {
           totalSteps: 3,
           currentStepIndex: 2
         })
+        
+        // 各データタイプの取得を確認
+        console.log(`${type}データ確認:`, ownerData[type])
       }
       
       // 完全なServerDataオブジェクトを作成
@@ -180,6 +186,16 @@ export function useNewFirebaseSync(): FirebaseSyncResult {
         settings: ownerData.settings || localSettings
       }
       
+      console.log('取得したデータ詳細:', {
+        players: completeOwnerData.players.length,
+        sessions: completeOwnerData.sessions.length,
+        receipts: completeOwnerData.receipts.length,
+        dailySales: completeOwnerData.dailySales.length,
+        history: completeOwnerData.history.length,
+        settings: completeOwnerData.settings
+      })
+      
+      // 即座にserverDataを更新
       setServerData(completeOwnerData)
       setLastSyncTime(new Date())
       setSyncProgress(null)
@@ -377,6 +393,8 @@ export function useNewFirebaseSync(): FirebaseSyncResult {
       return newFirebaseSync.onDataChange(type, (data) => {
         console.log(`=== ${type} データ更新 ===`)
         console.log('Data:', data)
+        console.log('Data length:', data.length)
+        console.log('Timestamp:', new Date().toLocaleTimeString())
         
         setServerData(prev => {
           const newData = prev ? { ...prev } : {
@@ -395,10 +413,18 @@ export function useNewFirebaseSync(): FirebaseSyncResult {
           }
           
           console.log(`新しい${type}データ:`, newData[type])
+          console.log(`更新後のserverData:`, {
+            players: newData.players.length,
+            sessions: newData.sessions.length,
+            receipts: newData.receipts.length,
+            dailySales: newData.dailySales.length,
+            history: newData.history.length
+          })
           return newData
         })
         
         setLastSyncTime(new Date())
+        console.log('Last sync time updated to:', new Date().toLocaleTimeString())
       })
     })
     
