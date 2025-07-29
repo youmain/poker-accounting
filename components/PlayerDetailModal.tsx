@@ -69,7 +69,7 @@ export function PlayerDetailModal({
   // 現在の残高を取得
   const getCurrentBalance = () => {
     if (currentSession) {
-      return currentSession.currentChips
+      return currentSession.finalChips || 0
     }
     if (playerReceipt) {
       const finalStack = playerReceipt.items.find((item) => item.name === "終了時スタック")?.amount || 0
@@ -98,7 +98,7 @@ export function PlayerDetailModal({
     if (adjustmentAmount > 0 && adjustmentNote.trim()) {
       const transaction: Omit<StackTransaction, "id"> = {
         playerId: player.id,
-        type,
+        type: type === "add" ? "buy-in" : "cash-out",
         amount: adjustmentAmount,
         note: adjustmentNote,
         timestamp: new Date().toISOString(),
@@ -217,25 +217,11 @@ export function PlayerDetailModal({
                 {currentSession && (
                   <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
                     <h4 className="font-medium text-green-800 mb-2">現在のセッション</h4>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div>
-                        開始時間: {currentSession.startTime ? new Date(currentSession.startTime).toLocaleString() : "-"}
-                      </div>
-                      <div>開始チップ: ¥{(currentSession.startingChips || 0).toLocaleString()}</div>
-                      <div>現在チップ: ¥{(currentSession.currentChips || 0).toLocaleString()}</div>
-                      <div>
-                        損益:{" "}
-                        <span
-                          className={
-                            currentSession.currentChips - currentSession.startingChips >= 0
-                              ? "text-green-600"
-                              : "text-red-600"
-                          }
-                        >
-                          {currentSession.currentChips - currentSession.startingChips >= 0 ? "+" : ""}¥
-                          {(currentSession.currentChips - currentSession.startingChips).toLocaleString()}
-                        </span>
-                      </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>開始時間: {currentSession.startTime.toLocaleString()}</div>
+                      <div>終了時間: {currentSession.endTime?.toLocaleString() || "進行中"}</div>
+                      <div>買い込み: ¥{(currentSession.buyIn || 0).toLocaleString()}</div>
+                      <div>最終チップ: ¥{(currentSession.finalChips || 0).toLocaleString()}</div>
                     </div>
                   </div>
                 )}

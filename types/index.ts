@@ -190,7 +190,7 @@ export interface NetworkSyncResult extends BaseSyncResult {
 }
 
 export interface FirebaseSyncResult extends BaseSyncResult {
-  sessionId: string
+  sessionId: string | null
   connectedDevices: number
   isHost: boolean
   connectedUsers: any[]
