@@ -14,8 +14,15 @@ export function useFirebaseSync(): FirebaseSyncResult {
   const [connectedDevices, setConnectedDevices] = useState<number>(0)
   const [isHost, setIsHost] = useState(false)
   const [connectedUsers, setConnectedUsers] = useState<ConnectedUser[]>([])
+  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null)
+  const [syncProgress, setSyncProgress] = useState<{
+    isSyncing: boolean
+    currentStep: string
+    totalSteps: number
+    currentStepIndex: number
+  } | null>(null)
 
-  // ローカルストレージからデータを初期化（共通ユーティリティ使用）
+  // ローカルストレージからデータを初期化
   const initializeFromLocalStorage = useCallback(() => {
     try {
       return localStorageUtils.initializeServerData()
@@ -29,195 +36,265 @@ export function useFirebaseSync(): FirebaseSyncResult {
   const saveToServer = useCallback(
     async (type: keyof ServerData, data: any) => {
       try {
-        console.log(`Saving ${type} data to Firebase - isConnected: ${isConnected}, isHost: ${isHost}`)
+        console.log(`=== saveToServer called ===`)
+        console.log(`Type: ${type}`)
+        console.log(`Data:`, data)
+        console.log(`isConnected: ${isConnected}`)
+        console.log(`sessionId: ${sessionId}`)
+        console.log(`Timestamp: ${new Date().toLocaleTimeString()}`)
         
-        // ローカルストレージにも保存
         localStorageUtils.saveDataType(type, data)
+        console.log(`Data saved to local storage`)
 
-        // Firebaseに保存（接続中の全ユーザーが書き込み可能）
-        if (isConnected) {
-          await firebaseManager.saveData(type, data)
-          console.log(`${type} data saved to Firebase successfully`)
+        if (isConnected && sessionId) {
+          console.log(`Calling firebaseManager.saveSessionData...`)
+          console.log(`Saving to session: ${sessionId}`)
+          console.log(`Document ID will be: ${sessionId}-${type}`)
+          
+          await firebaseManager.saveSessionData(type, data, sessionId)
+          console.log(`${type} data saved to Firebase session ${sessionId} successfully`)
+          console.log(`Firebase save completed at: ${new Date().toLocaleTimeString()}`)
+          
+          setLastSyncTime(new Date())
+          console.log(`Last sync time updated to: ${new Date().toLocaleTimeString()}`)
         } else {
-          console.log(`Not connected to Firebase, skipping ${type} save`)
+          console.log(`Not connected to Firebase or no sessionId, skipping ${type} save`)
+          console.log(`isConnected: ${isConnected}, sessionId: ${sessionId}`)
         }
-
-        // ローカルのステートも更新
+        
         setServerData((prev: ServerData | null) => {
           if (!prev) return prev
-          return {
+          const newData = {
             ...prev,
             [type]: data,
           }
+          console.log(`Local serverData updated for ${type}`)
+          console.log(`New serverData:`, newData)
+          return newData
         })
-
+        console.log(`Local serverData updated`)
         return true
       } catch (error) {
         console.error(`データ保存エラー (${type}):`, error)
+        console.error(`Error details:`, {
+          type,
+          sessionId,
+          isConnected,
+          error: error instanceof Error ? error.message : String(error)
+        })
         return false
       }
     },
-    [isConnected, isHost],
+    [isConnected, isHost, sessionId],
   )
 
-  // 新しいセッションを作成（ホスト）
+  // オーナーの全データを取得して同期
+  const fetchAndSyncOwnerData = useCallback(async (targetSessionId: string) => {
+    console.log("=== fetchAndSyncOwnerData START ===")
+    console.log("Fetching owner data for session:", targetSessionId)
+    
+    // 進行状況表示を開始
+    setSyncProgress({
+      isSyncing: true,
+      currentStep: "ホストのデータを受信中...",
+      totalSteps: 1,
+      currentStepIndex: 0
+    })
+    
+    try {
+      // 全データを一度に取得
+      const [players, receipts, sessions, dailySales, history, settings] = await Promise.all([
+        firebaseManager.getSessionData('players', targetSessionId),
+        firebaseManager.getSessionData('receipts', targetSessionId),
+        firebaseManager.getSessionData('sessions', targetSessionId),
+        firebaseManager.getSessionData('dailySales', targetSessionId),
+        firebaseManager.getSessionData('history', targetSessionId),
+        firebaseManager.getSessionData('settings', targetSessionId)
+      ])
+
+      // ローカルストレージに保存
+      const ownerData = { 
+        players, 
+        receipts, 
+        sessions, 
+        dailySales, 
+        history, 
+        settings: settings && settings.length > 0 ? settings[0] : null 
+      }
+      
+      console.log("=== 受信したデータ ===")
+      console.log("players:", players?.length || 0, "件")
+      console.log("receipts:", receipts?.length || 0, "件")
+      console.log("sessions:", sessions?.length || 0, "件")
+      console.log("dailySales:", dailySales?.length || 0, "件")
+      console.log("history:", history?.length || 0, "件")
+      console.log("settings:", settings ? "あり" : "なし")
+      
+      // 直接setServerDataを呼び出してUIを更新
+      console.log("=== setServerDataを直接呼び出し ===")
+      setServerData(ownerData)
+      console.log("serverData updated with owner data")
+      console.log("Owner data details:", {
+        players: ownerData.players?.length || 0,
+        receipts: ownerData.receipts?.length || 0,
+        sessions: ownerData.sessions?.length || 0,
+        dailySales: ownerData.dailySales?.length || 0,
+        history: ownerData.history?.length || 0
+      })
+      
+      // ローカルストレージにも保存
+      localStorageUtils.saveReceivedData(ownerData, setServerData)
+      console.log("Data saved to localStorage")
+
+      // 最終同期時刻を更新
+      setLastSyncTime(new Date())
+      console.log("Last sync time updated")
+
+      // 進行状況表示を完了
+      setSyncProgress({
+        isSyncing: false,
+        currentStep: "データ受信完了",
+        totalSteps: 1,
+        currentStepIndex: 1
+      })
+
+      console.log("All owner data synchronized successfully")
+      console.log("=== fetchAndSyncOwnerData COMPLETED ===")
+      return true
+    } catch (error) {
+      console.error("Owner data sync error:", error)
+      setSyncProgress(null)
+      return false
+    }
+  }, [])
+
+  // 新しいセッションを作成（ホスト用）
   const createNewSession = useCallback(async (hostName?: string) => {
     console.log("=== createNewSession START ===")
-    setIsLoading(true)
+    console.log("Host name:", hostName)
+    
     try {
-      // Firebase認証を実行
+      // Firebase認証
       await firebaseManager.signInAnonymously()
-      console.log("Firebase authentication completed")
       
-      // 新しいセッションIDを生成
-      const newSessionId = `session-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
-      console.log("Generated sessionId:", newSessionId)
+      // セッションID生成
+      const newSessionId = `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+      console.log("Generated session ID:", newSessionId)
       
-      setSessionId(newSessionId)
-      setIsHost(true) // ホストとして設定
-      console.log("Set sessionId and isHost")
-
-      // ローカルデータを初期化してFirebaseに保存
+      // 初期データをFirebaseに保存
       const initialData = initializeFromLocalStorage()
       if (initialData) {
-        console.log("Initial data from local storage:", {
-          players: initialData.players.length,
-          sessions: initialData.sessions.length,
-          receipts: initialData.receipts.length,
-          dailySales: initialData.dailySales.length,
-          history: initialData.history.length,
-          settings: initialData.settings
-        })
-        
-        // プレイヤーデータの詳細をログ出力
-        if (initialData.players.length > 0) {
-          console.log("Local players data:", initialData.players)
-        }
-        
-        console.log("Saving initial data to Firebase")
-        // 初期データをFirebaseに保存（セッション固有）
-        console.log("Saving initial data to Firebase with sessionId:", newSessionId)
-        console.log("Initial data to save:", {
-          players: initialData.players.length,
-          sessions: initialData.sessions.length,
-          receipts: initialData.receipts.length,
-          dailySales: initialData.dailySales.length,
-          history: initialData.history.length,
-          settings: initialData.settings
-        })
-        
-        await Promise.all([
-          firebaseManager.saveSessionData("players", initialData.players, newSessionId),
-          firebaseManager.saveSessionData("sessions", initialData.sessions, newSessionId),
-          firebaseManager.saveSessionData("receipts", initialData.receipts, newSessionId),
-          firebaseManager.saveSessionData("dailySales", initialData.dailySales, newSessionId),
-          firebaseManager.saveSessionData("history", initialData.history, newSessionId),
-          firebaseManager.saveSessionData("settings", initialData.settings, newSessionId),
-        ])
-        console.log("All initial data saved to Firebase successfully")
-        setServerData(initialData)
-        console.log("Initial data saved and set")
+        await firebaseManager.saveSessionData('players', initialData.players || [], newSessionId)
+        await firebaseManager.saveSessionData('receipts', initialData.receipts || [], newSessionId)
+        await firebaseManager.saveSessionData('sessions', initialData.sessions || [], newSessionId)
+        await firebaseManager.saveSessionData('dailySales', initialData.dailySales || [], newSessionId)
+        await firebaseManager.saveSessionData('history', initialData.history || [], newSessionId)
+        await firebaseManager.saveSessionData('settings', [initialData.settings], newSessionId)
       }
 
-      setIsConnected(true)
-      setConnectedDevices(1) // 初期は1台（自分だけ）
-      
       // 接続者として追加
-      console.log("Adding host as connected user...")
-      const finalHostName = hostName || "オーナー"
-      console.log("Host name:", finalHostName)
-      await addConnectedUser(finalHostName, true, newSessionId)
-      
+      await firebaseManager.addConnectedUser({
+        name: hostName || "ホスト",
+        isHost: true,
+        deviceId: `device-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        sessionId: newSessionId
+      })
+
+      setSessionId(newSessionId)
+      setIsHost(true)
+      setIsConnected(true)
+      setServerData(initialData)
+
       console.log("=== createNewSession COMPLETED ===")
-      console.log("Final state - sessionId:", newSessionId, "isHost: true, isConnected: true")
       return newSessionId
     } catch (error) {
       console.error("セッション作成エラー:", error)
       return null
-    } finally {
-      setIsLoading(false)
     }
   }, [initializeFromLocalStorage])
 
   // 既存のセッションに参加（クライアント）
-  const joinSession = useCallback(async (sessionId: string) => {
+  const joinSession = useCallback(async (targetSessionId: string) => {
+    console.log("=== joinSession CALLED ===")
+    console.log("Session ID:", targetSessionId)
+    
     setIsLoading(true)
+    
+    // URLパラメータから名前を取得
+    const urlParams = new URLSearchParams(window.location.search)
+    const participantName = urlParams.get('name') || "参加者"
+    console.log("Participant name from URL:", participantName)
+    
     try {
       console.log("=== joinSession START ===")
-      console.log("Joining session:", sessionId)
+      console.log("Joining session:", targetSessionId)
+      console.log("Participant name:", participantName)
+      
+      // 参加者向けの進行状況表示を開始
+      setSyncProgress({
+        isSyncing: true,
+        currentStep: `${participantName}さんこんにちは、ホストのデータを受信します。`,
+        totalSteps: 3,
+        currentStepIndex: 0
+      })
       
       // Firebase認証を実行
       await firebaseManager.signInAnonymously()
       console.log("Firebase authentication completed")
       
+      // 進行状況を更新
+      setSyncProgress({
+        isSyncing: true,
+        currentStep: "セッションに接続中...",
+        totalSteps: 3,
+        currentStepIndex: 1
+      })
+      
       // セッションIDを設定
-      setSessionId(sessionId)
+      setSessionId(targetSessionId)
       setIsHost(false) // 参加者として設定
       console.log("Set sessionId and isHost: false")
 
-      // Firebaseからオーナーの全データを取得（セッション固有でない）
-      console.log("Fetching all owner data from Firebase...")
-      const players = await firebaseManager.getData("players")
-      const sessions = await firebaseManager.getData("sessions")
-      const receipts = await firebaseManager.getData("receipts")
-      const dailySales = await firebaseManager.getData("dailySales")
-      const history = await firebaseManager.getData("history")
-      const settings = await firebaseManager.getData("settings")
-
-      console.log("Data fetched from Firebase:")
-      console.log("- Players:", players?.length || 0, "items")
-      console.log("- Sessions:", sessions?.length || 0, "items")
-      console.log("- Receipts:", receipts?.length || 0, "items")
-      console.log("- DailySales:", dailySales?.length || 0, "items")
-      console.log("- History:", history?.length || 0, "items")
-      console.log("- Settings:", settings?.length || 0, "items")
+      // 進行状況を更新
+      setSyncProgress({
+        isSyncing: true,
+        currentStep: "ホストのデータを受信中...",
+        totalSteps: 3,
+        currentStepIndex: 2
+      })
       
-      // 詳細なデータ内容をログ出力
-      if (players && players.length > 0) {
-        console.log("Players data details:", players)
-      }
-      if (sessions && sessions.length > 0) {
-        console.log("Sessions data details:", sessions)
-      }
-      if (receipts && receipts.length > 0) {
-        console.log("Receipts data details:", receipts)
+      // オーナーの全データを取得して同期
+      const success = await fetchAndSyncOwnerData(targetSessionId)
+      if (!success) {
+        console.error("Failed to fetch owner data")
+        setSyncProgress(null)
+        return false
       }
 
-      const firebaseData: ServerData = {
-        players: players || [],
-        sessions: sessions || [],
-        receipts: receipts || [],
-        dailySales: dailySales || [],
-        history: history || [],
-        settings: settings[0] || localStorageUtils.initializeServerData().settings,
-      }
-
-      // ローカルストレージに同期データを保存
-      console.log("Saving synced data to local storage...")
-      localStorageUtils.saveDataType("players", firebaseData.players)
-      localStorageUtils.saveDataType("sessions", firebaseData.sessions)
-      localStorageUtils.saveDataType("receipts", firebaseData.receipts)
-      localStorageUtils.saveDataType("dailySales", firebaseData.dailySales)
-      localStorageUtils.saveDataType("history", firebaseData.history)
-      localStorageUtils.saveDataType("settings", firebaseData.settings)
-
-      setServerData(firebaseData)
       setIsConnected(true)
       setConnectedDevices(1) // 初期は1台（自分だけ）
       
       console.log("Initial data synced and set")
       
-      // 接続者として追加
-      console.log("Adding participant as connected user...")
-      // URLパラメータから名前を取得
-      const urlParams = new URLSearchParams(window.location.search)
-      const participantName = urlParams.get('name') || "参加者"
-      console.log("Participant name from URL:", participantName)
-      await addConnectedUser(participantName, false, sessionId)
+      // 進行状況を完了
+      setSyncProgress({
+        isSyncing: false,
+        currentStep: "接続完了",
+        totalSteps: 3,
+        currentStepIndex: 3
+      })
       
+      // 接続者として追加
+      await firebaseManager.addConnectedUser({
+        name: participantName,
+        isHost: false,
+        deviceId: `device-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        sessionId: targetSessionId
+      })
+      console.log("Connected user added successfully")
+
       console.log("=== joinSession COMPLETED ===")
-      console.log("Final state - sessionId:", sessionId, "isHost: false, isConnected: true")
-      console.log("All data synchronized from owner")
+      console.log("Final state - sessionId:", targetSessionId, "isHost: false, isConnected: true")
       return true
     } catch (error) {
       console.error("セッション参加エラー:", error)
@@ -225,106 +302,65 @@ export function useFirebaseSync(): FirebaseSyncResult {
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [fetchAndSyncOwnerData])
 
-  // データをリフレッシュ
-  const refreshData = useCallback(async () => {
-    if (!isConnected) return false
-
-    try {
-      const players = await firebaseManager.getData("players")
-      const sessions = await firebaseManager.getData("sessions")
-      const receipts = await firebaseManager.getData("receipts")
-      const dailySales = await firebaseManager.getData("dailySales")
-      const history = await firebaseManager.getData("history")
-      const settings = await firebaseManager.getData("settings")
-
-      const firebaseData: ServerData = {
-        players: players || [],
-        sessions: sessions || [],
-        receipts: receipts || [],
-        dailySales: dailySales || [],
-        history: history || [],
-        settings: settings[0] || localStorageUtils.initializeServerData().settings,
-      }
-
-      setServerData(firebaseData)
-      return true
-    } catch (error) {
-      console.error("データリフレッシュエラー:", error)
-      return false
-    }
-  }, [isConnected])
-
-  // セッションから退出
+  // セッションを離脱
   const leaveSession = useCallback(async () => {
-    try {
-      setIsConnected(false)
-      setIsHost(false) // ホスト状態もリセット
-      setSessionId("")
-      setConnectedDevices(0)
-      // ローカルデータで初期化
-      const localData = initializeFromLocalStorage()
-      setServerData(localData)
-    } catch (error) {
-      console.error("セッション退出エラー:", error)
-    }
-  }, [initializeFromLocalStorage])
-
-  // 接続者を追加
-  const addConnectedUser = useCallback(async (name: string, isHost: boolean, currentSessionId?: string) => {
-    console.log("=== addConnectedUser called ===")
-    const targetSessionId = currentSessionId || sessionId
-    console.log("sessionId:", targetSessionId)
-    console.log("name:", name)
-    console.log("isHost:", isHost)
-    
-    if (!targetSessionId) {
-      console.log("No sessionId available, skipping addConnectedUser")
-      return
-    }
-    
-    try {
-      const userData = {
-        name,
-        isHost,
-        deviceId: `device-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-        sessionId: targetSessionId
+    console.log("=== leaveSession ===")
+    if (sessionId) {
+      try {
+        // 接続者リストから削除
+        await firebaseManager.removeConnectedUser()
+        console.log("Removed from connected users")
+      } catch (error) {
+        console.error("接続者削除エラー:", error)
       }
-      console.log("Adding connected user with data:", userData)
-      
-      await firebaseManager.addConnectedUser(userData)
-      console.log("Connected user added successfully:", { name, isHost, sessionId: targetSessionId })
-    } catch (error) {
-      console.error("接続者追加エラー:", error)
     }
+    
+    setSessionId("")
+    setIsConnected(false)
+    setIsHost(false)
+    setConnectedDevices(0)
+    setConnectedUsers([])
+    setServerData(null) // serverDataをリセット
+    setLastSyncTime(null) // lastSyncTimeをリセット
+    setSyncProgress(null)
+    console.log("Session left successfully")
   }, [sessionId])
 
-  // 接続者を削除
-  const removeConnectedUser = useCallback(async () => {
-    try {
-      await firebaseManager.removeConnectedUser()
-      console.log("Connected user removed")
-    } catch (error) {
-      console.error("接続者削除エラー:", error)
+  // データを再読み込み
+  const refreshData = useCallback(async () => {
+    console.log("=== refreshData ===")
+    const localData = initializeFromLocalStorage()
+    if (localData) {
+      setServerData(localData)
+      console.log("Data refreshed from local storage")
+      return true
     }
-  }, [])
-
-  // 接続状態を更新
-  const updateConnectedDevices = useCallback((count: number) => {
-    setConnectedDevices(count)
-  }, [])
+    return false
+  }, [initializeFromLocalStorage])
 
   // 初期化
   useEffect(() => {
     const initialize = async () => {
+      console.log("=== useFirebaseSync initialize ===")
+      
       try {
-        // ローカルデータで初期化
+        // ローカルストレージから初期データを読み込み
         const localData = initializeFromLocalStorage()
-        setServerData(localData)
-        setIsConnected(false) // 初期状態はオフライン
-        setIsHost(false) // 初期状態は参加者
-        setConnectedDevices(0) // 初期状態は0台
+        if (localData) {
+          setServerData(localData)
+          console.log("Initial data loaded from local storage")
+          console.log("Initial data:", {
+            players: localData.players?.length || 0,
+            receipts: localData.receipts?.length || 0,
+            sessions: localData.sessions?.length || 0,
+            dailySales: localData.dailySales?.length || 0,
+            history: localData.history?.length || 0
+          })
+        } else {
+          console.log("No local data found")
+        }
       } catch (error) {
         console.error("初期化エラー:", error)
       } finally {
@@ -335,65 +371,174 @@ export function useFirebaseSync(): FirebaseSyncResult {
     initialize()
   }, [initializeFromLocalStorage])
 
-  // Firebaseリアルタイム同期の設定
+  // 接続状態の監視
   useEffect(() => {
+    console.log("=== Connection state check ===")
+    console.log("isConnected:", isConnected)
+    console.log("sessionId:", sessionId)
+    console.log("isHost:", isHost)
+    console.log("serverData:", serverData ? "loaded" : "null")
+  }, [isConnected, sessionId, isHost, serverData])
+
+  // リアルタイムリスナー設定
+  useEffect(() => {
+    console.log("=== Real-time listener setup check ===")
+    console.log("sessionId:", sessionId)
+    console.log("isConnected:", isConnected)
+    console.log("isHost:", isHost)
+    
     if (!sessionId || !isConnected) {
-      console.log("Firebase real-time listeners not set up - sessionId:", sessionId, "isConnected:", isConnected)
+      console.log("❌ Firebase real-time listeners not set up - sessionId:", sessionId, "isConnected:", isConnected)
       return
     }
 
-    console.log("Setting up Firebase real-time listeners for session:", sessionId, "isHost:", isHost)
-    
-    // 接続者のリアルタイム監視
-    console.log("Setting up real-time listener for session:", sessionId)
+    console.log("✅ Setting up Firebase real-time listeners for session:", sessionId, "isHost:", isHost)
+
+    // 接続者一覧の監視
     const unsubscribeUsers = firebaseManager.onConnectedUsersChange(sessionId, (users) => {
       console.log("=== Connected users updated ===")
       console.log("Users count:", users.length)
       console.log("Users:", users)
       setConnectedUsers(users)
       setConnectedDevices(users.length)
-      console.log("Updated connectedDevices to:", users.length)
     })
 
-    // オーナーの全データのリアルタイム同期を設定
-    console.log("Setting up real-time data listeners for all owner data")
-    const unsubscribePlayers = firebaseManager.onDataChange("players", (players: any[]) => {
-      console.log("=== Players data updated ===")
-      console.log("Players:", players)
-      setServerData(prev => prev ? { ...prev, players: players || [] } : null)
+    // プレイヤーデータの監視
+    const unsubscribePlayers = firebaseManager.onSessionDataChange('players', sessionId, (data) => {
+      console.log("=== Players session data updated ===")
+      console.log("Players:", data)
+      console.log("Previous serverData:", serverData)
+      setServerData(prev => {
+        const newData = prev ? { ...prev, players: data } : { 
+          players: data, 
+          sessions: [], 
+          receipts: [], 
+          dailySales: [], 
+          history: [], 
+          settings: {
+            confirmedRake: 0,
+            rakeConfirmed: false,
+            ownerMode: true,
+            currentBusinessDate: new Date().toISOString().split("T")[0]
+          }
+        }
+        console.log("New serverData:", newData)
+        return newData
+      })
+      localStorageUtils.saveDataType('players', data)
+      setLastSyncTime(new Date())
     })
 
-    const unsubscribeSessions = firebaseManager.onDataChange("sessions", (sessions: any[]) => {
-      console.log("=== Sessions data updated ===")
-      console.log("Sessions:", sessions)
-      setServerData(prev => prev ? { ...prev, sessions: sessions || [] } : null)
+    // セッションデータの監視
+    const unsubscribeSessions = firebaseManager.onSessionDataChange('sessions', sessionId, (data) => {
+      console.log("=== Sessions session data updated ===")
+      console.log("Sessions:", data)
+      setServerData(prev => prev ? { ...prev, sessions: data } : { 
+        players: [], 
+        sessions: data, 
+        receipts: [], 
+        dailySales: [], 
+        history: [], 
+        settings: {
+          confirmedRake: 0,
+          rakeConfirmed: false,
+          ownerMode: true,
+          currentBusinessDate: new Date().toISOString().split("T")[0]
+        }
+      })
+      localStorageUtils.saveDataType('sessions', data)
+      setLastSyncTime(new Date())
     })
 
-    const unsubscribeReceipts = firebaseManager.onDataChange("receipts", (receipts: any[]) => {
-      console.log("=== Receipts data updated ===")
-      console.log("Receipts:", receipts)
-      setServerData(prev => prev ? { ...prev, receipts: receipts || [] } : null)
+    // 伝票データの監視
+    const unsubscribeReceipts = firebaseManager.onSessionDataChange('receipts', sessionId, (data) => {
+      console.log("=== Receipts session data updated ===")
+      console.log("Receipts:", data)
+      setServerData(prev => prev ? { ...prev, receipts: data } : { 
+        players: [], 
+        sessions: [], 
+        receipts: data, 
+        dailySales: [], 
+        history: [], 
+        settings: {
+          confirmedRake: 0,
+          rakeConfirmed: false,
+          ownerMode: true,
+          currentBusinessDate: new Date().toISOString().split("T")[0]
+        }
+      })
+      localStorageUtils.saveDataType('receipts', data)
+      setLastSyncTime(new Date())
     })
 
-    const unsubscribeDailySales = firebaseManager.onDataChange("dailySales", (dailySales: any[]) => {
-      console.log("=== DailySales data updated ===")
-      console.log("DailySales:", dailySales)
-      setServerData(prev => prev ? { ...prev, dailySales: dailySales || [] } : null)
+    // 売上データの監視
+    const unsubscribeDailySales = firebaseManager.onSessionDataChange('dailySales', sessionId, (data) => {
+      console.log("=== DailySales session data updated ===")
+      console.log("DailySales:", data)
+      setServerData(prev => prev ? { ...prev, dailySales: data } : { 
+        players: [], 
+        sessions: [], 
+        receipts: [], 
+        dailySales: data, 
+        history: [], 
+        settings: {
+          confirmedRake: 0,
+          rakeConfirmed: false,
+          ownerMode: true,
+          currentBusinessDate: new Date().toISOString().split("T")[0]
+        }
+      })
+      localStorageUtils.saveDataType('dailySales', data)
+      setLastSyncTime(new Date())
     })
 
-    const unsubscribeHistory = firebaseManager.onDataChange("history", (history: any[]) => {
-      console.log("=== History data updated ===")
-      console.log("History:", history)
-      setServerData(prev => prev ? { ...prev, history: history || [] } : null)
+    // 履歴データの監視
+    const unsubscribeHistory = firebaseManager.onSessionDataChange('history', sessionId, (data) => {
+      console.log("=== History session data updated ===")
+      console.log("History:", data)
+      setServerData(prev => prev ? { ...prev, history: data } : { 
+        players: [], 
+        sessions: [], 
+        receipts: [], 
+        dailySales: [], 
+        history: data, 
+        settings: {
+          confirmedRake: 0,
+          rakeConfirmed: false,
+          ownerMode: true,
+          currentBusinessDate: new Date().toISOString().split("T")[0]
+        }
+      })
+      localStorageUtils.saveDataType('history', data)
+      setLastSyncTime(new Date())
     })
 
-    const unsubscribeSettings = firebaseManager.onDataChange("settings", (settings: any[]) => {
-      console.log("=== Settings data updated ===")
-      console.log("Settings:", settings)
-      setServerData(prev => prev ? { ...prev, settings: settings[0] || prev.settings } : null)
+    // 設定データの監視
+    const unsubscribeSettings = firebaseManager.onSessionDataChange('settings', sessionId, (data) => {
+      console.log("=== Settings session data updated ===")
+      console.log("Settings:", data)
+      const settingsData = data && data.length > 0 ? data[0] : {
+        confirmedRake: 0,
+        rakeConfirmed: false,
+        ownerMode: true,
+        currentBusinessDate: new Date().toISOString().split("T")[0]
+      }
+      setServerData(prev => prev ? { ...prev, settings: settingsData } : { 
+        players: [], 
+        sessions: [], 
+        receipts: [], 
+        dailySales: [], 
+        history: [], 
+        settings: settingsData
+      })
+      localStorageUtils.saveDataType('settings', settingsData)
+      setLastSyncTime(new Date())
     })
+
+    console.log("✅ All real-time listeners set up successfully")
 
     return () => {
+      console.log("🧹 Cleaning up Firebase real-time listeners")
       unsubscribeUsers()
       unsubscribePlayers()
       unsubscribeSessions()
@@ -401,19 +546,9 @@ export function useFirebaseSync(): FirebaseSyncResult {
       unsubscribeDailySales()
       unsubscribeHistory()
       unsubscribeSettings()
-      console.log("Cleaned up Firebase real-time listeners")
+      console.log("✅ Cleaned up Firebase real-time listeners")
     }
-  }, [sessionId, isConnected, isHost])
-
-  // 接続状態の監視（一時的に無効化）
-  // useEffect(() => {
-  //   if (!isConnected && sessionId) {
-  //     // 接続が切れた場合、セッション状態をリセット
-  //     setSessionId("")
-  //     setIsHost(false)
-  //     setConnectedDevices(0)
-  //   }
-  // }, [isConnected, sessionId])
+  }, [sessionId, isConnected]) // isHostを依存配列から削除
 
   return {
     isConnected,
@@ -423,6 +558,9 @@ export function useFirebaseSync(): FirebaseSyncResult {
     connectedDevices,
     isHost,
     connectedUsers,
+    lastSyncTime,
+    syncVersion: 2.0,
+    syncProgress,
     saveToServer,
     createNewSession,
     joinSession,

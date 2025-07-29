@@ -69,12 +69,16 @@ export function StableSyncModal({
     isLoading: firebaseLoading,
     sessionId,
     isHost: firebaseIsHost,
+    lastSyncTime,
+    syncVersion: firebaseSyncVersion,
+    syncProgress: firebaseSyncProgress,
     createNewSession,
     joinSession,
     leaveSession,
     refreshData: firebaseRefreshData,
     connectedDevices: firebaseConnectedDevices,
     connectedUsers,
+    serverData,
   } = useFirebaseSync()
 
   // 統合された状態
@@ -85,6 +89,7 @@ export function StableSyncModal({
   // デバッグ用ログ
   useEffect(() => {
     console.log("=== StableSyncModal State ===")
+    console.log("isOpen:", isOpen)
     console.log("syncMode:", syncMode)
     console.log("isConnected:", isConnected)
     console.log("isHost:", isHost)
@@ -94,6 +99,7 @@ export function StableSyncModal({
     console.log("firebaseIsHost:", firebaseIsHost)
     console.log("sessionId:", sessionId)
     console.log("roomId:", roomId)
+    console.log("firebaseSyncProgress:", firebaseSyncProgress)
     
     // QRコード表示条件のデバッグ
     const qrCondition1 = isHost
@@ -144,6 +150,14 @@ export function StableSyncModal({
           console.log("Setting welcome message and auto-connecting for:", decodedName)
 
           setWelcomeMessage(`${decodedName}さん、こんにちは！自動接続中...`)
+          
+          // デバッグ用のアラートを追加
+          console.log("=== URL PARAMETERS DEBUG ===")
+          console.log("nameParam:", nameParam)
+          console.log("decodedName:", decodedName)
+          console.log("isConnected:", isConnected)
+          console.log("sessionParam:", sessionParam)
+          console.log("roomParam:", roomParam)
 
           // 自動接続を実行
           const autoConnect = async () => {
@@ -151,7 +165,15 @@ export function StableSyncModal({
               // Firebaseセッション接続（インターネット）
               console.log("Starting Firebase auto-connection to session:", sessionParam)
               setSyncMode("internet")
+              
+              // URLパラメータに参加者名を設定
+              const url = new URL(window.location.href)
+              url.searchParams.set("name", decodedName)
+              window.history.replaceState({}, "", url.toString())
+              
+              console.log("Calling joinSession with sessionParam:", sessionParam)
               const success = await joinSession(sessionParam)
+              console.log("joinSession result:", success)
               
               if (success) {
                 console.log("Firebase auto-connection successful")
@@ -193,6 +215,12 @@ export function StableSyncModal({
                 
                 // ローカル失敗時はインターネット同期を試行
                 setSyncMode("internet")
+                
+                // URLパラメータに参加者名を設定
+                const url = new URL(window.location.href)
+                url.searchParams.set("name", decodedName)
+                window.history.replaceState({}, "", url.toString())
+                
                 const internetSuccess = await joinSession(roomParam.toUpperCase())
                 
                 if (internetSuccess) {
@@ -300,6 +328,13 @@ export function StableSyncModal({
     
     if (syncMode === "internet") {
       // Firebaseセッション参加
+      // URLパラメータに参加者名を設定
+      if (typeof window !== "undefined") {
+        const url = new URL(window.location.href)
+        url.searchParams.set("name", inviteeName.trim() || "参加者")
+        window.history.replaceState({}, "", url.toString())
+      }
+      
       const success = await joinSession(roomIdInput.trim())
       if (success) {
         setRoomIdInput("")
@@ -492,12 +527,20 @@ export function StableSyncModal({
 
   const handleManualSync = async () => {
     try {
-      await refreshData()
-      const isUpToDate = await checkDataIntegrity()
-      toast({
-        title: "同期完了",
-        description: isUpToDate ? "データは最新です。" : "データを更新しました。",
-      })
+      if (syncMode === "internet") {
+        await firebaseRefreshData()
+        toast({
+          title: "同期完了",
+          description: "データを更新しました。",
+        })
+      } else {
+        await refreshData()
+        const isUpToDate = await checkDataIntegrity()
+        toast({
+          title: "同期完了",
+          description: isUpToDate ? "データは最新です。" : "データを更新しました。",
+        })
+      }
     } catch (error) {
       console.error("Manual sync error:", error)
       toast({
@@ -582,6 +625,107 @@ export function StableSyncModal({
               </Alert>
             )}
 
+            {/* 同期進行状況の表示 */}
+            {(() => {
+              console.log("=== Sync Progress Display Check ===")
+              console.log("firebaseSyncProgress:", firebaseSyncProgress)
+              console.log("firebaseSyncProgress?.isSyncing:", firebaseSyncProgress?.isSyncing)
+              return null
+            })()}
+            {/* 基本的なデバッグ情報 */}
+            <Alert className="bg-yellow-50 border-yellow-200 border-2">
+              <AlertDescription className="text-yellow-800">
+                <div className="font-bold text-lg">🔍 デバッグ情報</div>
+                <div className="text-sm mt-2">
+                  <div>isConnected: {isConnected ? "true" : "false"}</div>
+                  <div>isHost: {isHost ? "true" : "false"}</div>
+                  <div>sessionId: {sessionId || "なし"}</div>
+                  <div>firebaseConnected: {firebaseConnected ? "true" : "false"}</div>
+                  <div>firebaseIsHost: {firebaseIsHost ? "true" : "false"}</div>
+                  <div>firebaseSyncProgress: {firebaseSyncProgress ? "あり" : "なし"}</div>
+                  <div>リアルタイムリスナー: {sessionId && isConnected ? "設定済み" : "未設定"}</div>
+                  <div>最終同期時刻: {lastSyncTime ? lastSyncTime.toLocaleTimeString() : "なし"}</div>
+                </div>
+              </AlertDescription>
+            </Alert>
+
+            {/* 進行状況表示（デバッグ用） */}
+            {firebaseSyncProgress && (
+              <Alert className="bg-blue-50 border-blue-200 border-2">
+                <RefreshCw className={`h-5 w-5 text-blue-600 ${firebaseSyncProgress.isSyncing ? 'animate-spin' : ''}`} />
+                <AlertDescription className="text-blue-800">
+                  <div className="font-bold text-lg">
+                    {firebaseSyncProgress.isSyncing ? "🔄 データ同期中..." : "✅ データ同期完了"}
+                  </div>
+                  <div className="text-base mt-2 font-medium">{firebaseSyncProgress.currentStep}</div>
+                  <div className="mt-3">
+                    <div className="w-full bg-blue-200 rounded-full h-3">
+                      <div 
+                        className="bg-blue-600 h-3 rounded-full transition-all duration-300"
+                        style={{ 
+                          width: `${(firebaseSyncProgress.currentStepIndex / firebaseSyncProgress.totalSteps) * 100}%` 
+                        }}
+                      ></div>
+                    </div>
+                    <div className="text-sm text-blue-600 mt-2 font-medium">
+                      進行状況: {firebaseSyncProgress.currentStepIndex} / {firebaseSyncProgress.totalSteps}
+                    </div>
+                  </div>
+                  {firebaseSyncProgress.isSyncing ? (
+                    <div className="text-xs text-blue-500 mt-2">
+                      🔄 同期中...
+                    </div>
+                  ) : (
+                    <div className="text-xs text-green-500 mt-2">
+                      ✅ 同期完了
+                    </div>
+                  )}
+                  <div className="text-xs text-red-500 mt-1">
+                    進行状況オブジェクト: {JSON.stringify(firebaseSyncProgress)}
+                  </div>
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {/* 同期完了の表示 */}
+            {firebaseSyncProgress && !firebaseSyncProgress.isSyncing && firebaseSyncProgress.currentStep === "同期完了" && (
+              <Alert className="bg-green-50 border-green-200">
+                <CheckCircle className="h-4 w-4 text-green-600" />
+                <AlertDescription className="text-green-800">
+                  <div className="font-medium">データ同期完了</div>
+                  <div className="text-sm mt-1">ホストのデータが正常に同期されました</div>
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {/* リアルタイム更新状態の表示 */}
+            <Alert className="bg-blue-50 border-blue-200 border-2">
+              <AlertDescription className="text-blue-800">
+                <div className="font-bold text-lg">🔄 リアルタイム同期状態</div>
+                <div className="text-sm mt-2">
+                  <div>接続状態: {isConnected ? "✅ 接続中" : "❌ 未接続"}</div>
+                  <div>セッションID: {sessionId || "なし"}</div>
+                  <div>リスナー設定: {sessionId && isConnected ? "✅ 設定済み" : "❌ 未設定"}</div>
+                  <div>最終更新: {lastSyncTime ? lastSyncTime.toLocaleTimeString() : "なし"}</div>
+                  <div className="mt-2 text-xs text-blue-600">
+                    ※ ホストがデータを更新すると、ここにリアルタイムで反映されます
+                  </div>
+                  <div className="mt-2 text-xs text-red-600">
+                    🔍 デバッグ: リスナーID = {sessionId ? `${sessionId}-players` : "なし"}
+                  </div>
+                  <div className="text-xs text-red-600">
+                    🔍 デバッグ: 現在時刻 = {new Date().toLocaleTimeString()}
+                  </div>
+                  <div className="text-xs text-red-600">
+                    🔍 デバッグ: 最終更新からの経過 = {lastSyncTime ? `${Math.floor((new Date().getTime() - lastSyncTime.getTime()) / 1000)}秒` : "不明"}
+                  </div>
+                  <div className="text-xs text-red-600">
+                    🔍 デバッグ: 受信データ = {serverData ? `プレイヤー${serverData.players?.length || 0}件, 伝票${serverData.receipts?.length || 0}件` : "なし"}
+                  </div>
+                </div>
+              </AlertDescription>
+            </Alert>
+
             {/* 接続状況 */}
             <Card>
               <CardHeader className="pb-3">
@@ -623,8 +767,23 @@ export function StableSyncModal({
 
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-gray-600">データバージョン:</span>
-                      <span className="text-sm font-mono">v{syncVersion}</span>
+                      <span className="text-sm font-mono">
+                        {syncMode === "internet" ? `v${firebaseSyncVersion || 2.0}` : `v${syncVersion}`}
+                      </span>
                     </div>
+
+                    {lastSyncTime && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600">最終同期:</span>
+                        <span className="text-sm text-gray-500">
+                          {lastSyncTime.toLocaleTimeString("ja-JP", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            second: "2-digit"
+                          })}
+                        </span>
+                      </div>
+                    )}
 
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-gray-600">接続デバイス:</span>

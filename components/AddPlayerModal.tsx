@@ -12,18 +12,23 @@ import type { Player } from "@/types"
 
 interface AddPlayerModalProps {
   isOpen: boolean
-  onClose: () => void
-  onAddPlayer: (player: Omit<Player, "id">) => void
+  onCloseAction: () => void
+  onAddPlayerAction: (player: Omit<Player, "id">) => void
 }
 
-export function AddPlayerModal({ isOpen, onClose, onAddPlayer }: AddPlayerModalProps) {
+export function AddPlayerModal({ isOpen, onCloseAction, onAddPlayerAction }: AddPlayerModalProps) {
   const [name, setName] = useState("")
   const [initialAmount, setInitialAmount] = useState("0")
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    console.log("=== AddPlayerModal handleSubmit ===")
+    console.log("name:", name.trim())
+    console.log("initialAmount:", initialAmount)
+    
     if (name.trim()) {
-      onAddPlayer({
+      console.log("Calling onAddPlayerAction...")
+      onAddPlayerAction({
         name: name.trim(),
         currentChips: 0,
         totalBuyIn: 0,
@@ -31,21 +36,26 @@ export function AddPlayerModal({ isOpen, onClose, onAddPlayer }: AddPlayerModalP
         totalProfit: 0,
         gameCount: 0,
         status: "inactive",
+        dailyHistory: [],
+        stackHistory: [],
         initialAmount: initialAmount ? Number.parseInt(initialAmount) : undefined,
       })
+      console.log("onAddPlayerAction called successfully")
       setName("")
       setInitialAmount("")
-      onClose()
+      onCloseAction()
+    } else {
+      console.log("Name is empty, not calling onAddPlayerAction")
     }
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+            <Dialog open={isOpen} onOpenChange={onCloseAction}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between">
             新規プレイヤー追加
-            <Button variant="ghost" size="sm" onClick={onClose}>
+            <Button variant="ghost" size="sm" onClick={onCloseAction}>
               <X className="h-4 w-4" />
             </Button>
           </DialogTitle>

@@ -155,20 +155,29 @@ export class FirebaseManager {
     }
   }
 
-  // データを保存
+  // データを保存（リアルタイム同期対応）
   async saveData(type: keyof ServerData, data: any): Promise<void> {
     if (!auth.currentUser) throw new Error('ユーザーが認証されていません')
     
     console.log(`Saving ${type} data to Firebase:`, data)
     
+    // 既存のデータを削除してから新しいデータを保存（単一ドキュメント方式）
+    const collectionRef = collection(db, type.toString())
+    const querySnapshot = await getDocs(collectionRef)
+    
+    // 既存のドキュメントを削除
+    const deletePromises = querySnapshot.docs.map(doc => deleteDoc(doc.ref))
+    await Promise.all(deletePromises)
+    
+    // 新しいデータを保存
     const docData = {
-      ...data,
+      data: data,
       userId: auth.currentUser.uid,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     }
 
-    await addDoc(collection(db, type.toString()), docData)
+    await addDoc(collectionRef, docData)
     console.log(`${type} data saved successfully`)
   }
 
@@ -178,27 +187,66 @@ export class FirebaseManager {
     
     console.log(`Saving ${type} data to Firebase for session ${sessionId}:`, data)
     
+    // データ全体をJSON文字列として保存（ネスト配列問題を完全回避）
+    console.log("=== saveSessionData START ===")
+    console.log("Original data type:", typeof data)
+    console.log("Original data is array:", Array.isArray(data))
+    console.log("Original data length:", Array.isArray(data) ? data.length : "N/A")
+    
+    // データ全体をJSON文字列に変換
+    let jsonData: string
+    try {
+      jsonData = JSON.stringify(data)
+      console.log("Successfully converted data to JSON string, length:", jsonData.length)
+    } catch (error) {
+      console.error("Failed to stringify data:", error)
+      throw new Error(`データのJSON変換に失敗しました: ${error}`)
+    }
+    
+    // セッション固有のドキュメントIDを生成
+    const docId = `${sessionId}-${type}`
+    
+    // 新しいデータを保存（JSON文字列として）
     const docData = {
-      ...data,
+      data: jsonData,  // JSON文字列として保存
       sessionId: sessionId,
       userId: auth.currentUser.uid,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     }
+    
+    console.log("Final docData to save:", {
+      ...docData,
+      data: `[JSON string, length: ${jsonData.length}]`
+    })
+    console.log("=== saveSessionData END ===")
 
-    await addDoc(collection(db, type.toString()), docData)
+    // docDataオブジェクト自体もフラット化して保存
+    const flattenedDocData = this.flattenDataForFirestore(docData)
+    console.log("Flattened docData:", {
+      ...flattenedDocData,
+      data: `[JSON string, length: ${jsonData.length}]`
+    })
+
+    // setDocを使用して直接保存（接続者一覧と同じ方式）
+    await setDoc(doc(db, type.toString(), docId), flattenedDocData)
     console.log(`${type} data saved successfully for session ${sessionId}`)
+    console.log(`Document ID: ${docId}`)
+    console.log(`Collection: ${type.toString()}`)
+    console.log(`Data length: ${jsonData.length} characters`)
   }
 
-  // データを取得
+  // データを取得（リアルタイム同期対応）
   async getData(type: keyof ServerData): Promise<any[]> {
     try {
       console.log(`Fetching ${type} data from Firebase...`)
       const querySnapshot = await getDocs(collection(db, type.toString()))
-      const data = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }))
+      const data = querySnapshot.docs.map(doc => {
+        const docData = doc.data()
+        // 新しい形式（dataフィールド）と古い形式（直接データ）の両方に対応
+        return docData.data || docData
+      }).filter(item => item && (Array.isArray(item) ? item.length > 0 : true))
+      
       console.log(`Fetched ${data.length} ${type} items:`, data)
       return data
     } catch (error) {
@@ -211,15 +259,52 @@ export class FirebaseManager {
   async getSessionData(type: keyof ServerData, sessionId: string): Promise<any[]> {
     try {
       console.log(`Fetching ${type} data from Firebase for session ${sessionId}...`)
-      const q = query(
-        collection(db, type.toString()),
-        where('sessionId', '==', sessionId)
-      )
-      const querySnapshot = await getDocs(q)
-      const data = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }))
+      
+      // セッション固有のドキュメントIDを生成
+      const docId = `${sessionId}-${type}`
+      
+      // 直接ドキュメントを取得
+      const docRef = doc(db, type.toString(), docId)
+      console.log(`Fetching document: ${docId} from collection: ${type.toString()}`)
+      const docSnapshot = await getDoc(docRef)
+      
+      if (!docSnapshot.exists()) {
+        console.log(`No ${type} data found for session ${sessionId}`)
+        console.log(`Document ID: ${docId} does not exist`)
+        return []
+      }
+      
+      console.log(`Document ${docId} exists, data:`, docSnapshot.data())
+      
+      const rawDocData = docSnapshot.data()
+      // フラット化されたdocDataを復元
+      const docData = this.restoreDataFromFirestore(rawDocData)
+      
+      // dataフィールドからJSON文字列を取得して復元
+      const jsonData = docData.data || "[]"
+      
+      let data: any[]
+      try {
+        if (typeof jsonData === 'string') {
+          // JSON文字列から復元
+          const parsedData = JSON.parse(jsonData)
+          console.log(`Successfully parsed ${type} data from JSON string`)
+          data = parsedData
+        } else {
+          // 古い形式のデータ（配列）の場合
+          console.log(`Found old format data for ${type}, using as is`)
+          data = jsonData
+        }
+      } catch (error) {
+        console.error(`Failed to parse ${type} data:`, error)
+        data = []
+      }
+      
+      // 配列でない場合は配列に変換
+      if (!Array.isArray(data)) {
+        data = [data]
+      }
+      
       console.log(`Fetched ${data.length} ${type} items for session ${sessionId}:`, data)
       return data
     } catch (error) {
@@ -294,31 +379,189 @@ export class FirebaseManager {
     })
   }
 
-  // データのリアルタイム監視
+  // データのリアルタイム監視（改善版）
   onDataChange(type: keyof ServerData, callback: (data: any[]) => void): () => void {
     return onSnapshot(collection(db, type.toString()), (snapshot: QuerySnapshot<DocumentData>) => {
-      const data = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }))
+      const data = snapshot.docs.map(doc => {
+        const docData = doc.data()
+        // 新しい形式（dataフィールド）と古い形式（直接データ）の両方に対応
+        return docData.data || docData
+      }).filter(item => item && (Array.isArray(item) ? item.length > 0 : true))
+      
+      console.log(`Real-time ${type} data update:`, data)
       callback(data)
     })
   }
 
   // セッション固有のデータのリアルタイム監視
   onSessionDataChange(type: keyof ServerData, sessionId: string, callback: (data: any[]) => void): () => void {
-    const q = query(
-      collection(db, type.toString()),
-      where('sessionId', '==', sessionId)
-    )
+    console.log(`=== onSessionDataChange setup ===`)
+    console.log(`Type: ${type}`)
+    console.log(`SessionId: ${sessionId}`)
+    const docId = `${sessionId}-${type}`
+    console.log(`Document ID: ${docId}`)
+    const docRef = doc(db, type.toString(), docId)
+    console.log(`Collection: ${type.toString()}`)
+    console.log(`Document path: ${type.toString()}/${docId}`)
+    console.log(`Setting up onSnapshot listener...`)
     
-    return onSnapshot(q, (snapshot: QuerySnapshot<DocumentData>) => {
-      const data = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }))
+    // リスナー設定の確認
+    const unsubscribe = onSnapshot(docRef, (docSnapshot) => {
+      console.log(`=== onSnapshot callback triggered ===`)
+      console.log(`Document exists: ${docSnapshot.exists()}`)
+      console.log(`Document ID: ${docSnapshot.id}`)
+      console.log(`Timestamp: ${new Date().toLocaleTimeString()}`)
+      
+      if (!docSnapshot.exists()) {
+        console.log(`No ${type} data found for session ${sessionId} in real-time`)
+        callback([])
+        return
+      }
+      
+      const rawDocData = docSnapshot.data()
+      console.log(`Raw document data:`, rawDocData)
+      const docData = this.restoreDataFromFirestore(rawDocData)
+      console.log(`Restored docData:`, docData)
+      const jsonData = docData.data || "[]"
+      console.log(`JSON data string:`, jsonData)
+      
+      let data: any[]
+      try {
+        if (typeof jsonData === 'string') {
+          const parsedData = JSON.parse(jsonData)
+          console.log(`Parsed data:`, parsedData)
+          data = parsedData
+        } else {
+          console.log(`Using old format data:`, jsonData)
+          data = jsonData
+        }
+      } catch (error) {
+        console.error(`Failed to parse ${type} data in real-time:`, error)
+        data = []
+      }
+      
+      if (!Array.isArray(data)) {
+        console.log(`Converting non-array data to array`)
+        data = [data]
+      }
+      
+      console.log(`Final data to callback:`, data)
+      console.log(`Calling callback with ${data.length} items`)
+      console.log(`Callback execution time: ${new Date().toLocaleTimeString()}`)
       callback(data)
+    }, (error) => {
+      console.error(`onSnapshot error for ${type}:`, error)
+      console.error(`Error details:`, {
+        type,
+        sessionId,
+        docId,
+        error: error.message,
+        code: error.code
+      })
     })
+    
+    console.log(`✅ onSessionDataChange listener set up successfully for ${type}`)
+    console.log(`Listener will monitor: ${type.toString()}/${docId}`)
+    
+    return unsubscribe
+  }
+
+  // データをFirestore用にフラット化
+  private flattenDataForFirestore(data: any): any {
+    console.log("=== flattenDataForFirestore START ===")
+    console.log("Input data type:", typeof data)
+    console.log("Input data is array:", Array.isArray(data))
+    
+    if (Array.isArray(data)) {
+      console.log("Processing array with", data.length, "items")
+      const flattenedArray = data.map((item, index) => {
+        console.log(`Processing array item ${index}:`, item)
+        const flattenedItem = this.flattenDataForFirestore(item)
+        console.log(`Flattened array item ${index}:`, flattenedItem)
+        return flattenedItem
+      })
+      console.log("Final flattened array result:", flattenedArray)
+      return flattenedArray
+    } else if (data && typeof data === 'object' && data !== null) {
+      console.log("Processing object with keys:", Object.keys(data))
+      const flattened: any = {}
+      
+      for (const [key, value] of Object.entries(data)) {
+        console.log(`Processing key "${key}":`, value)
+        console.log(`Key "${key}" type:`, typeof value)
+        console.log(`Key "${key}" is array:`, Array.isArray(value))
+        
+        if (Array.isArray(value)) {
+          // 配列は文字列として保存（Firestoreの制限回避）
+          console.log(`Converting array "${key}" to JSON string`)
+          try {
+            flattened[key] = JSON.stringify(value)
+            console.log(`Successfully converted "${key}" to:`, flattened[key])
+          } catch (error) {
+            console.error(`Failed to stringify "${key}":`, error)
+            flattened[key] = "[]" // フォールバック
+          }
+        } else if (value && typeof value === 'object' && value !== null) {
+          // オブジェクトも文字列として保存
+          console.log(`Converting object "${key}" to JSON string`)
+          try {
+            flattened[key] = JSON.stringify(value)
+            console.log(`Successfully converted "${key}" to:`, flattened[key])
+          } catch (error) {
+            console.error(`Failed to stringify "${key}":`, error)
+            flattened[key] = "{}" // フォールバック
+          }
+        } else {
+          // プリミティブ値はそのまま
+          console.log(`Keeping primitive "${key}" as is:`, value)
+          flattened[key] = value
+        }
+      }
+      
+      console.log("Final flattened object result:", flattened)
+      return flattened
+    } else {
+      console.log("Returning primitive value:", data)
+      return data
+    }
+  }
+
+  // ネストした配列やオブジェクトを検出
+  private hasNestedArraysOrObjects(data: any, depth: number = 0): boolean {
+    if (depth > 10) return false // 無限ループ防止
+    
+    if (Array.isArray(data)) {
+      return data.some(item => this.hasNestedArraysOrObjects(item, depth + 1))
+    } else if (data && typeof data === 'object' && data !== null) {
+      return Object.values(data).some(value => 
+        Array.isArray(value) || (value && typeof value === 'object' && value !== null)
+      )
+    }
+    return false
+  }
+
+  // フラット化されたデータを復元
+  private restoreDataFromFirestore(data: any): any {
+    if (Array.isArray(data)) {
+      return data.map(item => this.restoreDataFromFirestore(item))
+    } else if (data && typeof data === 'object') {
+      const restored: any = {}
+      for (const [key, value] of Object.entries(data)) {
+        if (typeof value === 'string' && (value.startsWith('[') || value.startsWith('{'))) {
+          try {
+            // JSON文字列を復元
+            restored[key] = JSON.parse(value)
+          } catch {
+            // パースに失敗した場合はそのまま
+            restored[key] = value
+          }
+        } else {
+          restored[key] = value
+        }
+      }
+      return restored
+    }
+    return data
   }
 
   // ログアウト

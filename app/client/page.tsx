@@ -256,7 +256,7 @@ export default function ClientPage() {
 
           {/* 説明 */}
           <div className="text-center pt-2">
-            <p className="text-xs text-gray-500">King High Poker System - Client Mode</p>
+            <p className="text-xs text-gray-500">King High Poker System ver.2 - Client Mode</p>
             {hostUrl && <p className="text-xs text-gray-400 mt-1 font-mono break-all">{hostUrl}</p>}
           </div>
         </CardContent>

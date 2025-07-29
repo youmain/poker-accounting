@@ -46,7 +46,7 @@ import {
 import { AddPlayerModal } from "@/components/AddPlayerModal"
 import { SalesCalendar } from "@/components/SalesCalendar"
 import { useLocalStorage } from "@/hooks/useLocalStorage"
-import { useStableSync } from "@/hooks/useStableSync"
+import { useFirebaseSync } from "@/hooks/useFirebaseSync"
 import { useFirebaseAuth } from "@/hooks/useFirebaseAuth"
 import type {
   Player,
@@ -155,17 +155,18 @@ export default function PokerManagementSystem() {
     refreshQRCode
   } = useFirebaseAuth()
 
-  // 真の共有同期システム
+  // Firebase同期システム
   const {
     isConnected,
     serverData,
     saveToServer,
     refreshData,
     connectedDevices,
-    updateConnectedDevices,
-    syncVersion,
-    checkDataIntegrity,
-  } = useStableSync()
+    sessionId,
+    isHost,
+    connectedUsers,
+    lastSyncTime,
+  } = useFirebaseSync()
 
   // ローカルストレージ（完全オフライン時のみ使用）
   const [localPlayers, setLocalPlayers] = useLocalStorage<Player[]>("poker-players-fallback", [])
@@ -181,24 +182,36 @@ export default function PokerManagementSystem() {
   })
 
   // データの取得（共有データを最優先、オフライン時のみローカル）
-  const players = isConnected ? serverData?.players || [] : localPlayers
-  const gameSessions = isConnected ? serverData?.sessions || [] : localGameSessions
-  const receipts = isConnected ? serverData?.receipts || [] : localReceipts
-  const dailySales = isConnected ? serverData?.dailySales || [] : localDailySales
-  const history = isConnected ? serverData?.history || [] : localHistory
-  const systemSettings = isConnected ? serverData?.settings || localSystemSettings : localSystemSettings
+  const players = isConnected && serverData ? serverData.players : localPlayers
+  const gameSessions = isConnected && serverData ? serverData.sessions : localGameSessions
+  const receipts = isConnected && serverData ? serverData.receipts : localReceipts
+  const dailySales = isConnected && serverData ? serverData.dailySales : localDailySales
+  const history = isConnected && serverData ? serverData.history : localHistory
+  const systemSettings = isConnected && serverData ? serverData.settings : localSystemSettings
 
   // データ更新関数（共有データを最優先）
   const setPlayers = async (newPlayers: Player[] | ((prev: Player[]) => Player[])) => {
     const updatedPlayers = typeof newPlayers === "function" ? newPlayers(players || []) : newPlayers
-
+    console.log("=== setPlayers called ===")
+    console.log("isConnected:", isConnected)
+    console.log("sessionId:", sessionId)
+    console.log("updatedPlayers count:", updatedPlayers.length)
+    console.log("updatedPlayers:", updatedPlayers)
+    console.log("Timestamp:", new Date().toLocaleTimeString())
+    
     if (isConnected) {
+      console.log("Saving to Firebase via saveToServer...")
+      console.log("Document ID will be:", sessionId ? `${sessionId}-players` : "none")
       const success = await saveToServer("players", updatedPlayers)
+      console.log("saveToServer result:", success)
+      console.log("saveToServer completed at:", new Date().toLocaleTimeString())
+      
       if (!success) {
         console.warn("Failed to save to server, falling back to local storage")
         setLocalPlayers(updatedPlayers)
       }
     } else {
+      console.log("Not connected, saving to local storage only")
       setLocalPlayers(updatedPlayers)
     }
   }
@@ -273,12 +286,12 @@ export default function PokerManagementSystem() {
     }
   }
 
-  // 定期的なデータ整合性チェック
+  // 定期的なデータ同期チェック
   useEffect(() => {
     if (isConnected) {
       const interval = setInterval(async () => {
-        const isUpToDate = await checkDataIntegrity()
-        if (!isUpToDate) {
+        const success = await refreshData()
+        if (success) {
           console.log("Data sync detected, refreshing...")
           setLastSyncCheck(new Date())
         }
@@ -286,7 +299,7 @@ export default function PokerManagementSystem() {
 
       return () => clearInterval(interval)
     }
-  }, [isConnected, checkDataIntegrity])
+  }, [isConnected, refreshData])
 
   // 履歴追加関数
   const addHistoryEntry = async (entry: Omit<HistoryEntry, "id" | "timestamp">) => {
@@ -424,7 +437,7 @@ export default function PokerManagementSystem() {
       currentPlayers: (gameSessions || []).filter((s) => s.status === "playing").length,
     })
     setClientPlayerCount((players || []).length)
-    setClientDeviceCount(connectedDevices.length)
+    setClientDeviceCount(typeof connectedDevices === 'number' ? connectedDevices : 0)
     setClientIsConnected(isConnected)
     
     // フィルタリングされたプレイヤーリストも更新
@@ -533,6 +546,11 @@ export default function PokerManagementSystem() {
   }
 
   const handleAddPlayer = async (newPlayer: Omit<Player, "id">) => {
+    console.log("=== handleAddPlayer called ===")
+    console.log("newPlayer:", newPlayer)
+    console.log("isConnected:", isConnected)
+    console.log("sessionId:", sessionId)
+    
     const player: Player = {
       ...newPlayer,
       id: Date.now().toString(),
@@ -557,9 +575,13 @@ export default function PokerManagementSystem() {
           ]
         : [],
     }
+    console.log("Created player object:", player)
+    console.log("Calling setPlayers...")
     await setPlayers([...(players || []), player])
+    console.log("setPlayers completed")
 
     // 履歴に追加
+    console.log("Adding history entry...")
     await addHistoryEntry({
       type: "player_add",
       description: `新規プレイヤー「${player.name}」を追加${newPlayer.initialAmount ? ` (初期チップ: ${formatCurrency(newPlayer.initialAmount)}©)` : ""}`,
@@ -569,6 +591,7 @@ export default function PokerManagementSystem() {
         amount: newPlayer.initialAmount,
       },
     })
+    console.log("=== handleAddPlayer completed ===")
   }
 
   const handleDeletePlayer = async (playerId: string) => {
@@ -1797,7 +1820,7 @@ export default function PokerManagementSystem() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-14 sm:h-16">
             <div className="flex items-center">
-              <h1 className="text-lg sm:text-xl font-semibold text-gray-900">King High Poker System</h1>
+                              <h1 className="text-lg sm:text-xl font-semibold text-gray-900">King High Poker System ver.2</h1>
               {!isOwnerMode && (
                 <Badge variant="secondary" className="ml-2 text-xs">
                   制限モード
@@ -1813,14 +1836,9 @@ export default function PokerManagementSystem() {
                 ) : isConnected ? (
                   <div className="flex items-center text-green-600">
                     <Wifi className="h-3 w-3 mr-1" />
-                    <span className="text-xs">同期中 v{syncVersion}</span>
+                    <span className="text-xs">同期中</span>
                   </div>
-                ) : (
-                  <div className="flex items-center text-red-600">
-                    <WifiOff className="h-3 w-3 mr-1" />
-                    <span className="text-xs">オフライン</span>
-                  </div>
-                )}
+                ) : null}
               </div>
             </div>
             <div className="flex items-center space-x-2 sm:space-x-4">
@@ -2427,11 +2445,11 @@ export default function PokerManagementSystem() {
       </main>
 
       {/* Modals */}
-      <AddPlayerModal
-        isOpen={showAddPlayerModal}
-        onClose={() => setShowAddPlayerModal(false)}
-        onAddPlayer={handleAddPlayer}
-      />
+              <AddPlayerModal
+          isOpen={showAddPlayerModal}
+          onCloseAction={() => setShowAddPlayerModal(false)}
+          onAddPlayerAction={handleAddPlayer}
+        />
 
       <StartGameModal
         isOpen={showStartGameModal}
@@ -2552,15 +2570,10 @@ export default function PokerManagementSystem() {
       <StableSyncModal
         isOpen={showStableSyncModal}
         onCloseAction={() => setShowStableSyncModal(false)}
-        connectedDevices={connectedDevices.map(d => typeof d === 'string' ? d : d.id)}
+        connectedDevices={Array.isArray(connectedDevices) ? connectedDevices.map(d => typeof d === 'string' ? d : d.id) : []}
         onUpdateConnectedDevices={ids => {
-          // connectedDevicesの元配列からid一致するSyncParticipant[]を作って渡す
-          if (Array.isArray(connectedDevices) && connectedDevices.length > 0 && typeof connectedDevices[0] !== 'string') {
-            const participants = connectedDevices.filter((d: any) => ids.includes(d.id))
-            updateConnectedDevices(participants)
-          } else {
-            updateConnectedDevices([])
-          }
+          // Firebase同期では接続者管理は自動で行われるため、ここでは何もしない
+          console.log("Connected devices updated:", ids)
         }}
       />
 

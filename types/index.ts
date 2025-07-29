@@ -194,6 +194,14 @@ export interface FirebaseSyncResult extends BaseSyncResult {
   connectedDevices: number
   isHost: boolean
   connectedUsers: any[]
+  lastSyncTime: Date | null
+  syncVersion?: number
+  syncProgress?: {
+    isSyncing: boolean
+    currentStep: string
+    totalSteps: number
+    currentStepIndex: number
+  } | null
   createNewSession: (hostName?: string) => Promise<string | null>
   joinSession: (sessionId: string) => Promise<boolean>
   leaveSession: () => Promise<void>

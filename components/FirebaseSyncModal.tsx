@@ -145,6 +145,13 @@ export function FirebaseSyncModal({ isOpen, onCloseAction }: FirebaseSyncModalPr
     setError("")
 
     try {
+      // URLパラメータに参加者名を設定してからjoinSessionを呼び出し
+      if (typeof window !== "undefined") {
+        const url = new URL(window.location.href)
+        url.searchParams.set("name", participantNameToJoin)
+        window.history.replaceState({}, "", url.toString())
+      }
+      
       const success = await joinSession(sessionIdToJoin)
       if (success) {
         toast({
