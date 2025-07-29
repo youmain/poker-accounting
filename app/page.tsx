@@ -189,12 +189,12 @@ export default function PokerManagementSystem() {
   })
 
   // データの取得（共有データを最優先、オフライン時のみローカル）
-  const players = isConnected && serverData ? serverData.players : localPlayers
-  const gameSessions = isConnected && serverData ? serverData.sessions : localGameSessions
-  const receipts = isConnected && serverData ? serverData.receipts : localReceipts
-  const dailySales = isConnected && serverData ? serverData.dailySales : localDailySales
-  const history = isConnected && serverData ? serverData.history : localHistory
-  const systemSettings = isConnected && serverData ? serverData.settings : localSystemSettings
+  const players = isConnected && serverData?.players ? serverData.players : localPlayers
+  const gameSessions = isConnected && serverData?.sessions ? serverData.sessions : localGameSessions
+  const receipts = isConnected && serverData?.receipts ? serverData.receipts : localReceipts
+  const dailySales = isConnected && serverData?.dailySales ? serverData.dailySales : localDailySales
+  const history = isConnected && serverData?.history ? serverData.history : localHistory
+  const systemSettings = isConnected && serverData?.settings ? serverData.settings : localSystemSettings
 
   // ローカルストレージの同期
   useEffect(() => {
@@ -471,14 +471,14 @@ export default function PokerManagementSystem() {
     
     // フィルタリングされたプレイヤーリストも更新
     const filtered = (players || []).filter((player) =>
-      player.name.toLowerCase().includes(playerSearchQuery.toLowerCase()),
+      player.name?.toLowerCase().includes(playerSearchQuery.toLowerCase()),
     )
     setClientFilteredPlayers(filtered)
     
     // フィルタリングされた履歴も更新
     const filteredHistory = (history || []).filter(
       (entry) =>
-        entry.description.toLowerCase().includes(historySearchQuery.toLowerCase()) ||
+        entry.description?.toLowerCase().includes(historySearchQuery.toLowerCase()) ||
         entry.details?.playerName?.toLowerCase().includes(historySearchQuery.toLowerCase()),
     )
     setClientFilteredHistory(filteredHistory)
@@ -488,13 +488,13 @@ export default function PokerManagementSystem() {
 
   // Filter players based on search query
   const filteredPlayers = (players || []).filter((player) =>
-    player.name.toLowerCase().includes(playerSearchQuery.toLowerCase()),
+    player.name?.toLowerCase().includes(playerSearchQuery.toLowerCase()),
   )
 
   // Filter history based on search query
   const filteredHistory = (history || []).filter(
     (entry) =>
-      entry.description.toLowerCase().includes(historySearchQuery.toLowerCase()) ||
+      entry.description?.toLowerCase().includes(historySearchQuery.toLowerCase()) ||
       entry.details?.playerName?.toLowerCase().includes(historySearchQuery.toLowerCase()),
   )
 

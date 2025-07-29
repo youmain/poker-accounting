@@ -33,7 +33,7 @@ export function StartGameModal({ isOpen, onClose, onStartGame, players, preselec
 
   // プレイヤー検索フィルター
   const filteredPlayers = players.filter((player) =>
-    player.name.toLowerCase().includes(playerSearchQuery.toLowerCase()),
+    player.name?.toLowerCase().includes(playerSearchQuery.toLowerCase()),
   )
 
   const handleSubmit = (e: React.FormEvent) => {
