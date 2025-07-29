@@ -353,6 +353,27 @@ export function useFirebaseSync(): FirebaseSyncResult {
     return false
   }, [initializeFromLocalStorage])
 
+  // 他のユーザーを切断（ホストのみ）
+  const disconnectUser = useCallback(async (targetUid: string): Promise<boolean> => {
+    console.log("=== disconnectUser called ===")
+    console.log("Target UID:", targetUid)
+    console.log("isHost:", isHost)
+    
+    if (!isHost) {
+      console.error("Only host can disconnect users")
+      return false
+    }
+    
+    try {
+      await firebaseManager.disconnectUser(targetUid)
+      console.log("User disconnected successfully")
+      return true
+    } catch (error) {
+      console.error("Failed to disconnect user:", error)
+      return false
+    }
+  }, [isHost])
+
   // 初期化
   useEffect(() => {
     const initialize = async () => {
@@ -579,5 +600,6 @@ export function useFirebaseSync(): FirebaseSyncResult {
     joinSession,
     leaveSession,
     refreshData,
+    disconnectUser,
   }
 }

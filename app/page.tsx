@@ -159,22 +159,29 @@ export default function PokerManagementSystem() {
   const {
     isConnected,
     serverData,
+    lastSyncTime,
+    syncProgress: firebaseSyncProgress,
+    connectedUsers,
+    connectedDevices,
+    isHost,
+    sessionId,
+    firebaseConnected,
+    firebaseIsHost,
     saveToServer,
     refreshData,
-    connectedDevices,
-    sessionId,
-    isHost,
-    connectedUsers,
-    lastSyncTime,
+    createNewSession,
+    joinSession,
+    leaveSession,
+    disconnectUser,
   } = useFirebaseSync()
 
-  // ローカルストレージ（完全オフライン時のみ使用）
-  const [localPlayers, setLocalPlayers] = useLocalStorage<Player[]>("poker-players-fallback", [])
-  const [localGameSessions, setLocalGameSessions] = useLocalStorage<GameSession[]>("poker-sessions-fallback", [])
-  const [localReceipts, setLocalReceipts] = useLocalStorage<Receipt[]>("poker-receipts-fallback", [])
-  const [localDailySales, setLocalDailySales] = useLocalStorage<DailySales[]>("poker-daily-sales-fallback", [])
-  const [localHistory, setLocalHistory] = useLocalStorage<HistoryEntry[]>("poker-history-fallback", [])
-  const [localSystemSettings, setLocalSystemSettings] = useLocalStorage<SystemSettings>("poker-settings-fallback", {
+  // ローカルストレージ関連
+  const [localPlayers, setLocalPlayers] = useState<Player[]>([])
+  const [localGameSessions, setLocalGameSessions] = useState<GameSession[]>([])
+  const [localReceipts, setLocalReceipts] = useState<Receipt[]>([])
+  const [localDailySales, setLocalDailySales] = useState<DailySales[]>([])
+  const [localHistory, setLocalHistory] = useState<HistoryEntry[]>([])
+  const [localSystemSettings, setLocalSystemSettings] = useState<SystemSettings>({
     confirmedRake: 0,
     rakeConfirmed: false,
     ownerMode: true,
@@ -2580,11 +2587,9 @@ export default function PokerManagementSystem() {
       <StableSyncModal
         isOpen={showStableSyncModal}
         onCloseAction={() => setShowStableSyncModal(false)}
-        connectedDevices={Array.isArray(connectedDevices) ? connectedDevices.map(d => typeof d === 'string' ? d : d.id) : []}
-        onUpdateConnectedDevices={ids => {
-          // Firebase同期では接続者管理は自動で行われるため、ここでは何もしない
-          console.log("Connected devices updated:", ids)
-        }}
+        connectedDevices={[]}
+        onUpdateConnectedDevices={(devices) => console.log("Connected devices updated:", devices)}
+        disconnectUser={disconnectUser}
       />
 
       <FirebaseTestModal

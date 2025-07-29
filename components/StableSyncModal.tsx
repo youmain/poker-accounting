@@ -32,6 +32,7 @@ interface StableSyncModalProps {
   onCloseAction: () => void
   connectedDevices?: string[]
   onUpdateConnectedDevices?: (devices: string[]) => void
+  disconnectUser?: (targetUid: string) => Promise<boolean>
 }
 
 export function StableSyncModal({
@@ -39,6 +40,7 @@ export function StableSyncModal({
   onCloseAction,
   connectedDevices = [],
   onUpdateConnectedDevices,
+  disconnectUser,
 }: StableSyncModalProps) {
   const [roomIdInput, setRoomIdInput] = useState("")
   const [inviteeName, setInviteeName] = useState("")
@@ -801,44 +803,63 @@ export function StableSyncModal({
                     {/* 接続者一覧 */}
                     {connectedUsers.length > 0 && (
                       <div className="pt-2 border-t">
-                                          <div className="text-sm text-gray-600 mb-2">接続者一覧:</div>
-                  <div className="space-y-2">
-                    {connectedUsers.map((user) => (
-                      <div
-                        key={user.uid}
-                        className="flex items-center justify-between p-2 bg-gray-50 rounded-md"
-                      >
-                        <div className="flex items-center gap-2">
-                          {user.isHost ? (
-                            <Crown className="h-4 w-4 text-yellow-600" />
-                          ) : (
-                            <User className="h-4 w-4 text-gray-500" />
-                          )}
-                          <div>
-                            <div className="font-medium text-sm">{user.name}</div>
-                            <div className="text-xs text-gray-500">
-                              {user.joinedAt ? formatJoinTime(user.joinedAt.toMillis()) : "接続中"}
+                        <div className="text-sm text-gray-600 mb-2">接続者一覧:</div>
+                        <div className="space-y-2">
+                          {connectedUsers.map((user) => (
+                            <div
+                              key={user.uid}
+                              className="flex items-center justify-between p-2 bg-gray-50 rounded-md"
+                            >
+                              <div className="flex items-center gap-2">
+                                {user.isHost ? (
+                                  <Crown className="h-4 w-4 text-yellow-600" />
+                                ) : (
+                                  <User className="h-4 w-4 text-gray-500" />
+                                )}
+                                <div>
+                                  <div className="font-medium text-sm">{user.name}</div>
+                                  <div className="text-xs text-gray-500">
+                                    {user.joinedAt ? formatJoinTime(user.joinedAt.toMillis()) : "接続中"}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {user.isHost && (
+                                  <Badge variant="default" className="text-xs">
+                                    オーナー
+                                  </Badge>
+                                )}
+                                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                                {disconnectUser && isHost && !user.isHost && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={async () => {
+                                      if (confirm(`${user.name}さんを切断しますか？`)) {
+                                        const success = await disconnectUser(user.uid)
+                                        if (success) {
+                                          console.log(`${user.name}さんを切断しました`)
+                                        } else {
+                                          console.error(`${user.name}さんの切断に失敗しました`)
+                                        }
+                                      }
+                                    }}
+                                    className="text-red-600 border-red-300 hover:bg-red-50"
+                                  >
+                                    切断
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        {connectedUsers.length > 1 && (
+                          <div className="mt-2 p-2 bg-blue-50 rounded-md">
+                            <div className="text-xs text-blue-700">
+                              💡 参加者が接続しました。データが自動的に同期されます。
                             </div>
                           </div>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          {user.isHost && (
-                            <Badge variant="default" className="text-xs">
-                              オーナー
-                            </Badge>
-                          )}
-                          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  {connectedUsers.length > 1 && (
-                    <div className="mt-2 p-2 bg-blue-50 rounded-md">
-                      <div className="text-xs text-blue-700">
-                        💡 参加者が接続しました。データが自動的に同期されます。
-                      </div>
-                    </div>
-                  )}
+                        )}
                       </div>
                     )}
 

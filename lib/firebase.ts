@@ -346,9 +346,37 @@ export class FirebaseManager {
 
   // 接続者を削除
   async removeConnectedUser(): Promise<void> {
-    if (!auth.currentUser) return
+    if (!auth.currentUser) throw new Error('ユーザーが認証されていません')
+    
+    console.log("=== Firebase removeConnectedUser ===")
+    console.log("Current user UID:", auth.currentUser.uid)
     
     await deleteDoc(doc(db, 'connectedUsers', auth.currentUser.uid))
+    console.log("Connected user removed successfully")
+  }
+
+  // 他のユーザーを切断（ホストのみ）
+  async disconnectUser(targetUid: string): Promise<void> {
+    if (!auth.currentUser) throw new Error('ユーザーが認証されていません')
+    
+    console.log("=== Firebase disconnectUser ===")
+    console.log("Target UID:", targetUid)
+    console.log("Current user UID:", auth.currentUser.uid)
+    
+    // ホストかどうかを確認
+    const currentUserDoc = await getDoc(doc(db, 'connectedUsers', auth.currentUser.uid))
+    if (!currentUserDoc.exists()) {
+      throw new Error('現在のユーザー情報が見つかりません')
+    }
+    
+    const currentUser = currentUserDoc.data() as ConnectedUser
+    if (!currentUser.isHost) {
+      throw new Error('ホストのみが他のユーザーを切断できます')
+    }
+    
+    // 対象ユーザーを削除
+    await deleteDoc(doc(db, 'connectedUsers', targetUid))
+    console.log("User disconnected successfully:", targetUid)
   }
 
   // セッションの接続者一覧を取得

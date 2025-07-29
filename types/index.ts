@@ -195,6 +195,8 @@ export interface FirebaseSyncResult extends BaseSyncResult {
   isHost: boolean
   connectedUsers: any[]
   lastSyncTime: Date | null
+  firebaseConnected: boolean
+  firebaseIsHost: boolean
   syncVersion?: number
   syncProgress?: {
     isSyncing: boolean
@@ -205,6 +207,7 @@ export interface FirebaseSyncResult extends BaseSyncResult {
   createNewSession: (hostName?: string) => Promise<string | null>
   joinSession: (sessionId: string) => Promise<boolean>
   leaveSession: () => Promise<void>
+  disconnectUser: (targetUid: string) => Promise<boolean>
 }
 
 export interface WebSocketSyncResult extends BaseSyncResult {
